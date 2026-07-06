@@ -12,7 +12,7 @@ Goal: prove the base developer loop.
 - Unit tests pin the behavior.
 - No external model calls or secrets required.
 
-Status: in progress.
+Status: complete.
 
 ## MVP 2 — Provider-backed Agent
 
@@ -24,7 +24,7 @@ Goal: add a real model provider behind a clean interface.
 - Add dry-run mode for local development.
 - Add basic safety controls: timeout, max retries, and redaction hooks.
 
-Status: queued.
+Status: in progress.
 
 ## MVP 3 — Tool-using Agent
 

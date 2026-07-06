@@ -12,8 +12,10 @@ Run it locally:
 
 ```powershell
 python -m pip install -e ".[dev]"
-python -m ai_agents "Plan a research workflow for market analysis"
+python -m ai_agents "Plan a research workflow for market analysis" --provider dry-run
 ```
+
+Provider selection defaults to `AI_AGENTS_PROVIDER`, falling back to `dry-run`.
 
 Run tests:
 

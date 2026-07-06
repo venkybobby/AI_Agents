@@ -24,7 +24,7 @@ Goal: add a real model provider behind a clean interface.
 - Add dry-run mode for local development.
 - Add basic safety controls: timeout, max retries, and redaction hooks.
 
-Status: in progress.
+Status: complete.
 
 ## MVP 3 — Tool-using Agent
 
@@ -35,7 +35,7 @@ Goal: let the agent inspect local files and propose changes.
 - Structured action log.
 - Tests for tool routing and refusal paths.
 
-Status: queued.
+Status: in progress.
 
 ## MVP 4 — Multi-agent Workflow
 

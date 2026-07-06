@@ -17,6 +17,12 @@ python -m ai_agents "Plan a research workflow for market analysis" --provider dr
 
 Provider selection defaults to `AI_AGENTS_PROVIDER`, falling back to `dry-run`.
 
+Inspect a workspace in read-only mode:
+
+```powershell
+python -m ai_agents "Review this repo shape" --inspect .
+```
+
 Run tests:
 
 ```powershell

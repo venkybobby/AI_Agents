@@ -69,3 +69,13 @@ domains/claims_anomaly/rules/claims_anomaly.yaml
 ```
 
 Runtime thresholds and reference data are read from SQLite in local/CI mode. A production deployment can replace this adapter with a managed database while preserving the same rule-pack contract.
+
+## 837 ingestion demo
+
+The claims domain can be exercised from a minimal 837P demo transaction:
+
+```powershell
+python -m ai_agents.domains.claims_837 domains/claims_anomaly/examples/clean_em_837p.edi
+```
+
+The demo adapter parses a narrow subset of 837P segments into normalized claim data, then executes the same configurable claims domain rules. It is intentionally not a full X12 validator; production should replace it with a certified EDI translator while preserving the normalized claim contract.

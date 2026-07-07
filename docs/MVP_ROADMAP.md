@@ -84,3 +84,15 @@ Goal: convert claims anomaly planning, tools, reviewer gates, and thresholds int
 - Core engine remains generic.
 
 Status: complete.
+
+## MVP 8 — 837 Claim Transaction Demo Ingest
+
+Goal: receive a demo 837P transaction and execute the claims anomaly flow end to end.
+
+- Parse supported 837P demo segments into normalized claim data.
+- Execute OIG, NCCI, medical necessity, and synthesis/routing steps.
+- Use configurable claims rules and DB-backed thresholds/reference data.
+- Add clean, NCCI violation, and OIG exclusion fixtures.
+- Add E2E tests for 837-to-routing outcomes.
+
+Status: complete.

@@ -13,6 +13,7 @@ dependencies = ["PyYAML>=6.0"]
 dev = ["pytest>=8.0"]
 openai = ["openai>=2.0.0"]
 postgres = ["psycopg[binary]>=3.2"]
+excel = ["openpyxl>=3.1"]
 
 [project.scripts]
 ai-agents = "ai_agents.cli:main"

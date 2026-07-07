@@ -79,6 +79,32 @@ python -m ai_agents.domains.ncci_importer `
   C:\path\to\Practitioner_PTP_Edits.zip
 ```
 
+## Excel/CSV extraction method
+
+If you want a DBA-friendly load file instead of direct app import, normalize CMS ZIP/TXT/CSV/XLSX files into one CSV:
+
+```powershell
+python -m pip install -e ".[excel]"
+
+python -m ai_agents.domains.ncci_importer `
+  --extract-csv .demo/ncci_ptp_2026q3_practitioner.csv `
+  --edit-type practitioner `
+  --import-version 2026Q3-v322r0 `
+  C:\path\to\Practitioner_PTP_Edits.zip
+```
+
+The output CSV columns are:
+
+```text
+code_a,code_b,modifier_indicator,edit_type,effective_date,deletion_date,rationale,source_file,import_version
+```
+
+Then load it with:
+
+```text
+supabase/load_ncci_ptp_from_csv.sql
+```
+
 ## Production notes
 
 - Store downloaded CMS file checksums and import metadata.

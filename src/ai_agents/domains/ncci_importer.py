@@ -15,6 +15,7 @@ import json
 import os
 import sqlite3
 import zipfile
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -158,6 +159,50 @@ def import_ncci_ptp_files_to_postgres(
     return rows.summary
 
 
+def extract_ncci_ptp_files_to_csv(
+    *,
+    files: Iterable[str | Path],
+    output_csv: str | Path,
+    edit_type: str,
+    import_version: str,
+) -> NCCIImportSummary:
+    """Extract CMS NCCI PTP source files into a normalized CSV."""
+
+    rows = _active_rows_from_files(files)
+    output_path = Path(output_csv)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(
+            [
+                "code_a",
+                "code_b",
+                "modifier_indicator",
+                "edit_type",
+                "effective_date",
+                "deletion_date",
+                "rationale",
+                "source_file",
+                "import_version",
+            ]
+        )
+        for row in rows.active:
+            writer.writerow(
+                [
+                    row.code_a,
+                    row.code_b,
+                    row.modifier_indicator,
+                    edit_type,
+                    row.effective_date or "",
+                    row.deletion_date or "",
+                    row.rationale or "",
+                    row.source_file,
+                    import_version,
+                ]
+            )
+    return rows.summary
+
+
 @dataclass(frozen=True)
 class _RowsFromFiles:
     active: tuple[NCCIPTPRow, ...]
@@ -201,13 +246,45 @@ def _iter_source_text(path: Path) -> Iterable[tuple[str, str]]:
             for member in archive.namelist():
                 if member.endswith("/"):
                     continue
-                if Path(member).suffix.lower() not in {".csv", ".txt"}:
+                suffix = Path(member).suffix.lower()
+                if suffix not in {".csv", ".txt", ".xlsx"}:
                     continue
-                with archive.open(member) as handle:
-                    yield member, _decode_bytes(handle.read())
+                if suffix == ".xlsx":
+                    with archive.open(member) as handle:
+                        yield from _iter_xlsx_rows(handle.read(), member)
+                else:
+                    with archive.open(member) as handle:
+                        yield member, _decode_bytes(handle.read())
+        return
+
+    if path.suffix.lower() == ".xlsx":
+        yield from _iter_xlsx_rows(path.read_bytes(), path.name)
         return
 
     yield path.name, path.read_text(encoding="utf-8-sig")
+
+
+def _iter_xlsx_rows(payload: bytes, source_name: str) -> Iterator[tuple[str, str]]:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:
+        raise NCCIImportError(
+            'Excel extraction requires: python -m pip install -e ".[excel]"'
+        ) from exc
+
+    workbook = load_workbook(io.BytesIO(payload), read_only=True, data_only=True)
+    for sheet in workbook.worksheets:
+        rows = sheet.iter_rows(values_only=True)
+        try:
+            header = next(rows)
+        except StopIteration:
+            continue
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["" if cell is None else cell for cell in header])
+        for row in rows:
+            writer.writerow(["" if cell is None else cell for cell in row])
+        yield f"{source_name}:{sheet.title}", output.getvalue()
 
 
 def _decode_bytes(payload: bytes) -> str:
@@ -293,6 +370,10 @@ def main(argv: list[str] | None = None) -> int:
         default=os.getenv("SUPABASE_DB_URL"),
         help="Supabase/Postgres connection URL. Defaults to SUPABASE_DB_URL.",
     )
+    destination.add_argument(
+        "--extract-csv",
+        help="Write normalized CSV instead of loading a database.",
+    )
     parser.add_argument(
         "--edit-type",
         required=True,
@@ -307,10 +388,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("files", nargs="+", help="CMS ZIP/TXT/CSV files to import.")
     args = parser.parse_args(argv)
 
-    if not args.db and not args.postgres_url:
-        parser.error("one of --db, --postgres-url, or SUPABASE_DB_URL is required")
+    if not args.db and not args.postgres_url and not args.extract_csv:
+        parser.error("one of --db, --postgres-url, --extract-csv, or SUPABASE_DB_URL is required")
 
-    if args.postgres_url:
+    if args.extract_csv:
+        summary = extract_ncci_ptp_files_to_csv(
+            files=args.files,
+            output_csv=args.extract_csv,
+            edit_type=args.edit_type,
+            import_version=args.import_version,
+        )
+    elif args.postgres_url:
         summary = import_ncci_ptp_files_to_postgres(
             postgres_url=args.postgres_url,
             files=args.files,

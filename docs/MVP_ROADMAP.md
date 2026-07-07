@@ -72,3 +72,15 @@ Goal: remove hardcoded planning/reviewer policy and make behavior governed by va
 - E2E tests execute the real CLI.
 
 Status: complete.
+
+## MVP 7 — Claims Anomaly Domain Pack
+
+Goal: convert claims anomaly planning, tools, reviewer gates, and thresholds into a production-style domain pack.
+
+- Claims rules are YAML, not Python conditionals.
+- Runtime thresholds/reference data are database-backed.
+- Domain tool adapters read from reference data.
+- E2E tests exercise seeded claims scenarios.
+- Core engine remains generic.
+
+Status: complete.

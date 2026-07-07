@@ -51,3 +51,21 @@ Expected behavior:
 - plan comes from the external rule pack;
 - reviewer event is present;
 - final status is deterministic.
+
+## Domain packs
+
+Domain-specific behavior belongs outside the core engine. A domain pack owns:
+
+- its rule YAML;
+- its reference/config schema;
+- seed fixtures for local and CI tests;
+- domain tool adapters;
+- E2E tests for representative flows.
+
+The first domain pack is `claims_anomaly`. Its business routing rules live in:
+
+```text
+domains/claims_anomaly/rules/claims_anomaly.yaml
+```
+
+Runtime thresholds and reference data are read from SQLite in local/CI mode. A production deployment can replace this adapter with a managed database while preserving the same rule-pack contract.

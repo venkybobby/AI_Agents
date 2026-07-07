@@ -1,0 +1,64 @@
+schema_version: 1
+id: claims_anomaly
+version: 0.1.0
+name: Claims Anomaly Domain Pack
+description: Configurable planning and reviewer gates for healthcare claims anomaly review.
+
+planning:
+  tools:
+    - name: check_oig_exclusion
+      condition:
+        type: always
+    - name: run_ncci_ptp_edit_check
+      condition:
+        type: min_list_length
+        field: cpt_codes
+        min: 2
+    - name: analyze_medical_necessity
+      condition:
+        type: any_prefix
+        field: cpt_codes
+        prefixes: ["99"]
+    - name: synthesize_decision
+      condition:
+        type: always
+
+routing:
+  default_route: MANUAL_REVIEW
+  gates:
+    - id: oig_exclusion
+      description: OIG LEIE exclusion is an absolute hard stop.
+      source: oig_exclusion.is_excluded
+      operator: equals
+      value: true
+      route: DENY_AND_REPORT
+    - id: ncci_failed
+      description: CMS NCCI PTP deterministic edit failure.
+      source: ncci_check.passed
+      operator: equals
+      value: false
+      route: DENY
+    - id: medical_necessity_failed
+      description: Clinical evidence does not support billed E/M complexity.
+      source: medical_necessity_check.is_supported
+      operator: equals
+      value: false
+      route: ESCALATE_SIU
+    - id: anomaly_auto_deny
+      description: Dynamic auto-deny threshold from reference DB.
+      source: anomaly_score
+      operator: gte_threshold
+      threshold_key: auto_deny
+      route: DENY
+    - id: anomaly_siu_escalation
+      description: Dynamic SIU escalation threshold from reference DB.
+      source: anomaly_score
+      operator: gte_threshold
+      threshold_key: siu_escalation
+      route: ESCALATE_SIU
+    - id: anomaly_auto_pay
+      description: Dynamic auto-pay threshold from reference DB.
+      source: anomaly_score
+      operator: lt_threshold
+      threshold_key: auto_pay
+      route: AUTO_PAY

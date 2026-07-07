@@ -9,6 +9,7 @@ This repository encodes claims-demo reference data from public CMS/OIG/AMA-align
   - `0`: modifier bypass is not allowed.
   - `1`: bypass may be allowed when an appropriate NCCI-associated modifier is present.
 - NCCI bypass modifiers are stored in `ncci_bypass_modifiers`, not hardcoded in Python.
+- Production NCCI PTP files are loaded with `ai_agents.domains.ncci_importer`; see `docs/NCCI_IMPORT.md`.
 - Office/outpatient E/M timing ranges for `99202`-`99215` are stored in `em_requirements`.
 - SSN and EIN masking is handled before log/display use.
 

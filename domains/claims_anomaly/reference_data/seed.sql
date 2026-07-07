@@ -8,9 +8,19 @@ INSERT OR REPLACE INTO oig_exclusions (id_type, provider_id, reason) VALUES
     ('EIN', '99-9999999', 'Seeded OIG LEIE exclusion fixture'),
     ('SSN', '999-99-9999', 'Seeded OIG LEIE exclusion fixture');
 
-INSERT OR REPLACE INTO ncci_ptp_edits (code_a, code_b, modifier_indicator) VALUES
-    ('97110', '97530', '1'),
-    ('11111', '22222', '0');
+INSERT OR REPLACE INTO ncci_ptp_edits (
+    code_a,
+    code_b,
+    modifier_indicator,
+    edit_type,
+    effective_date,
+    deletion_date,
+    rationale,
+    source_file,
+    import_version
+) VALUES
+    ('97110', '97530', '1', 'practitioner', '20260701', NULL, 'Seed PTP edit fixture', 'seed.sql', 'demo'),
+    ('11111', '22222', '0', 'practitioner', '20260701', NULL, 'Seed CCMI 0 fixture', 'seed.sql', 'demo');
 
 INSERT OR REPLACE INTO ncci_bypass_modifiers (modifier, category) VALUES
     ('59', 'distinct_procedural_service'),

@@ -9,6 +9,7 @@ from typing import Sequence
 from .agent import run_agent
 from .providers import ProviderError, provider_from_env, provider_from_name
 from .tools import ToolError
+from .workflow import run_workflow
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -26,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Read-only inspect a workspace directory and include a summary.",
     )
+    parser.add_argument(
+        "--workflow",
+        action="store_true",
+        help="Run the MVP4 planner/implementer/reviewer workflow.",
+    )
     return parser
 
 
@@ -39,7 +45,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.provider is not None
             else provider_from_env()
         )
-        result = run_agent(args.goal, provider, inspect_path=args.inspect)
+        result = (
+            run_workflow(args.goal, provider)
+            if args.workflow
+            else run_agent(args.goal, provider, inspect_path=args.inspect)
+        )
     except (ProviderError, ToolError, ValueError) as exc:
         parser.error(str(exc))
 

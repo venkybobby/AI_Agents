@@ -23,6 +23,12 @@ Inspect a workspace in read-only mode:
 python -m ai_agents "Review this repo shape" --inspect .
 ```
 
+Run the multi-role MVP4 workflow:
+
+```powershell
+python -m ai_agents "Prepare the next agent feature" --workflow
+```
+
 Run tests:
 
 ```powershell

@@ -35,7 +35,7 @@ Goal: let the agent inspect local files and propose changes.
 - Structured action log.
 - Tests for tool routing and refusal paths.
 
-Status: in progress.
+Status: complete.
 
 ## MVP 4 — Multi-agent Workflow
 
@@ -46,4 +46,4 @@ Goal: coordinate planner, implementer, and reviewer roles.
 - Reviewer gate before writing or publishing.
 - Run summary generated at the end.
 
-Status: queued.
+Status: complete.

@@ -55,6 +55,30 @@ python -m ai_agents.domains.ncci_importer `
 
 Repeat for every Practitioner and Hospital PTP ZIP from the active CMS quarter, using `--edit-type hospital` for hospital files.
 
+## Supabase/Postgres import
+
+Install the optional Postgres dependency:
+
+```powershell
+python -m pip install -e ".[postgres]"
+```
+
+Set a privileged server-side connection string. Do not use the publishable browser key for imports.
+
+```powershell
+$env:SUPABASE_DB_URL = "postgresql://..."
+```
+
+Import to Supabase/Postgres:
+
+```powershell
+python -m ai_agents.domains.ncci_importer `
+  --postgres-url $env:SUPABASE_DB_URL `
+  --edit-type practitioner `
+  --import-version 2026Q3-v322r0 `
+  C:\path\to\Practitioner_PTP_Edits.zip
+```
+
 ## Production notes
 
 - Store downloaded CMS file checksums and import metadata.

@@ -53,6 +53,17 @@ Download CMS NCCI PTP ZIP files as described in [NCCI_IMPORT.md](NCCI_IMPORT.md)
 
 For production, import into Supabase using a server-side job with privileged DB credentials. Do not attempt NCCI imports from a browser client.
 
+```powershell
+python -m pip install -e ".[postgres]"
+$env:SUPABASE_DB_URL = "postgresql://..."
+
+python -m ai_agents.domains.ncci_importer `
+  --postgres-url $env:SUPABASE_DB_URL `
+  --edit-type practitioner `
+  --import-version 2026Q3-v322r0 `
+  C:\path\to\Practitioner_PTP_Edits.zip
+```
+
 ## Next.js client note
 
 If a Next.js UI is added, install:

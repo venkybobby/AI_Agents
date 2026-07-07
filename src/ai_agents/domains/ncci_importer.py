@@ -12,6 +12,7 @@ import argparse
 import csv
 import io
 import json
+import os
 import sqlite3
 import zipfile
 from dataclasses import dataclass
@@ -63,55 +64,131 @@ def import_ncci_ptp_files(
 ) -> NCCIImportSummary:
     """Import CMS NCCI PTP edit files into SQLite."""
 
-    files_seen = 0
-    rows_seen = 0
-    rows_imported = 0
-    rows_skipped = 0
-
+    rows = _active_rows_from_files(files)
     with sqlite3.connect(Path(db_path)) as conn:
-        for source_path in files:
-            path = Path(source_path)
-            files_seen += 1
-            for source_name, text in _iter_source_text(path):
-                for row in _parse_ptp_text(text, source_name):
-                    rows_seen += 1
-                    if row.modifier_indicator == "9":
-                        rows_skipped += 1
-                        continue
-                    conn.execute(
-                        """
-                        INSERT OR REPLACE INTO ncci_ptp_edits (
-                            code_a,
-                            code_b,
-                            modifier_indicator,
-                            edit_type,
-                            effective_date,
-                            deletion_date,
-                            rationale,
-                            source_file,
-                            import_version
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            row.code_a,
-                            row.code_b,
-                            row.modifier_indicator,
-                            edit_type,
-                            row.effective_date,
-                            row.deletion_date,
-                            row.rationale,
-                            row.source_file,
-                            import_version,
-                        ),
-                    )
-                    rows_imported += 1
+        for row in rows.active:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO ncci_ptp_edits (
+                    code_a,
+                    code_b,
+                    modifier_indicator,
+                    edit_type,
+                    effective_date,
+                    deletion_date,
+                    rationale,
+                    source_file,
+                    import_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row.code_a,
+                    row.code_b,
+                    row.modifier_indicator,
+                    edit_type,
+                    row.effective_date,
+                    row.deletion_date,
+                    row.rationale,
+                    row.source_file,
+                    import_version,
+                ),
+            )
         conn.commit()
 
-    return NCCIImportSummary(
-        files_seen=files_seen,
-        rows_seen=rows_seen,
-        rows_imported=rows_imported,
-        rows_skipped=rows_skipped,
+    return rows.summary
+
+
+def import_ncci_ptp_files_to_postgres(
+    *,
+    postgres_url: str,
+    files: Iterable[str | Path],
+    edit_type: str,
+    import_version: str,
+) -> NCCIImportSummary:
+    """Import CMS NCCI PTP edit files into Supabase/Postgres."""
+
+    rows = _active_rows_from_files(files)
+    try:
+        import psycopg
+    except ImportError as exc:
+        raise NCCIImportError(
+            'Postgres import requires: python -m pip install -e ".[postgres]"'
+        ) from exc
+
+    with psycopg.connect(postgres_url) as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                """
+                insert into public.ncci_ptp_edits (
+                    code_a,
+                    code_b,
+                    modifier_indicator,
+                    edit_type,
+                    effective_date,
+                    deletion_date,
+                    rationale,
+                    source_file,
+                    import_version
+                ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                on conflict (code_a, code_b, edit_type) do update set
+                    modifier_indicator = excluded.modifier_indicator,
+                    effective_date = excluded.effective_date,
+                    deletion_date = excluded.deletion_date,
+                    rationale = excluded.rationale,
+                    source_file = excluded.source_file,
+                    import_version = excluded.import_version
+                """,
+                [
+                    (
+                        row.code_a,
+                        row.code_b,
+                        row.modifier_indicator,
+                        edit_type,
+                        row.effective_date,
+                        row.deletion_date,
+                        row.rationale,
+                        row.source_file,
+                        import_version,
+                    )
+                    for row in rows.active
+                ],
+            )
+        conn.commit()
+
+    return rows.summary
+
+
+@dataclass(frozen=True)
+class _RowsFromFiles:
+    active: tuple[NCCIPTPRow, ...]
+    summary: NCCIImportSummary
+
+
+def _active_rows_from_files(files: Iterable[str | Path]) -> _RowsFromFiles:
+    files_seen = 0
+    rows_seen = 0
+    rows_skipped = 0
+    active_rows: list[NCCIPTPRow] = []
+
+    for source_path in files:
+        path = Path(source_path)
+        files_seen += 1
+        for source_name, text in _iter_source_text(path):
+            for row in _parse_ptp_text(text, source_name):
+                rows_seen += 1
+                if row.modifier_indicator == "9":
+                    rows_skipped += 1
+                    continue
+                active_rows.append(row)
+
+    return _RowsFromFiles(
+        active=tuple(active_rows),
+        summary=NCCIImportSummary(
+            files_seen=files_seen,
+            rows_seen=rows_seen,
+            rows_imported=len(active_rows),
+            rows_skipped=rows_skipped,
+        ),
     )
 
 
@@ -209,7 +286,13 @@ def _normalize_header(header: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Import CMS NCCI PTP edit files.")
-    parser.add_argument("--db", required=True, help="SQLite reference DB path.")
+    destination = parser.add_mutually_exclusive_group()
+    destination.add_argument("--db", help="SQLite reference DB path.")
+    destination.add_argument(
+        "--postgres-url",
+        default=os.getenv("SUPABASE_DB_URL"),
+        help="Supabase/Postgres connection URL. Defaults to SUPABASE_DB_URL.",
+    )
     parser.add_argument(
         "--edit-type",
         required=True,
@@ -224,12 +307,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("files", nargs="+", help="CMS ZIP/TXT/CSV files to import.")
     args = parser.parse_args(argv)
 
-    summary = import_ncci_ptp_files(
-        db_path=args.db,
-        files=args.files,
-        edit_type=args.edit_type,
-        import_version=args.import_version,
-    )
+    if not args.db and not args.postgres_url:
+        parser.error("one of --db, --postgres-url, or SUPABASE_DB_URL is required")
+
+    if args.postgres_url:
+        summary = import_ncci_ptp_files_to_postgres(
+            postgres_url=args.postgres_url,
+            files=args.files,
+            edit_type=args.edit_type,
+            import_version=args.import_version,
+        )
+    else:
+        summary = import_ncci_ptp_files(
+            db_path=args.db,
+            files=args.files,
+            edit_type=args.edit_type,
+            import_version=args.import_version,
+        )
     print(json.dumps(summary.to_dict(), indent=2))
     return 0
 

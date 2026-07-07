@@ -12,6 +12,7 @@ dependencies = ["PyYAML>=6.0"]
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 openai = ["openai>=2.0.0"]
+postgres = ["psycopg[binary]>=3.2"]
 
 [project.scripts]
 ai-agents = "ai_agents.cli:main"

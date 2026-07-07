@@ -159,6 +159,87 @@ def import_ncci_ptp_files_to_postgres(
     return rows.summary
 
 
+def load_normalized_ncci_csv_to_sqlite(
+    *,
+    db_path: str | Path,
+    csv_files: Iterable[str | Path],
+    batch_size: int = 10_000,
+) -> NCCIImportSummary:
+    """Load already-normalized NCCI CSV files into SQLite in batches."""
+
+    files_seen = 0
+    rows_seen = 0
+    rows_imported = 0
+    rows_skipped = 0
+    db = Path(db_path)
+    db.parent.mkdir(parents=True, exist_ok=True)
+
+    with sqlite3.connect(db) as conn:
+        conn.execute("pragma journal_mode = wal")
+        conn.execute("pragma synchronous = normal")
+        conn.execute("pragma temp_store = memory")
+        for csv_file in csv_files:
+            files_seen += 1
+            batch: list[tuple[str, str, str, str, str | None, str | None, str | None, str | None, str | None]] = []
+            with Path(csv_file).open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                for row in reader:
+                    rows_seen += 1
+                    modifier_indicator = row.get("modifier_indicator", "").strip()
+                    if modifier_indicator not in {"0", "1"}:
+                        rows_skipped += 1
+                        continue
+                    batch.append(
+                        (
+                            row.get("code_a", "").strip(),
+                            row.get("code_b", "").strip(),
+                            modifier_indicator,
+                            row.get("edit_type", "").strip(),
+                            _blank_to_none(row.get("effective_date")),
+                            _blank_to_none(row.get("deletion_date")),
+                            _blank_to_none(row.get("rationale")),
+                            _blank_to_none(row.get("source_file")),
+                            _blank_to_none(row.get("import_version")),
+                        )
+                    )
+                    if len(batch) >= batch_size:
+                        rows_imported += _insert_sqlite_batch(conn, batch)
+                        batch.clear()
+                if batch:
+                    rows_imported += _insert_sqlite_batch(conn, batch)
+        conn.commit()
+
+    return NCCIImportSummary(
+        files_seen=files_seen,
+        rows_seen=rows_seen,
+        rows_imported=rows_imported,
+        rows_skipped=rows_skipped,
+    )
+
+
+def _insert_sqlite_batch(
+    conn: sqlite3.Connection,
+    batch: list[tuple[str, str, str, str, str | None, str | None, str | None, str | None, str | None]],
+) -> int:
+    conn.executemany(
+        """
+        INSERT OR REPLACE INTO ncci_ptp_edits (
+            code_a,
+            code_b,
+            modifier_indicator,
+            edit_type,
+            effective_date,
+            deletion_date,
+            rationale,
+            source_file,
+            import_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        batch,
+    )
+    return len(batch)
+
+
 def extract_ncci_ptp_files_to_csv(
     *,
     files: Iterable[str | Path],
@@ -388,6 +469,13 @@ def _normalize_header(header: str) -> str:
     return "".join(character.lower() for character in header if character.isalnum())
 
 
+def _blank_to_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Import CMS NCCI PTP edit files.")
     destination = parser.add_mutually_exclusive_group()
@@ -403,22 +491,37 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--edit-type",
-        required=True,
         choices=["practitioner", "hospital"],
         help="NCCI edit file family being imported.",
     )
     parser.add_argument(
         "--import-version",
-        required=True,
+        required=False,
         help="CMS version label, for example 2026Q3-v322r0.",
+    )
+    parser.add_argument(
+        "--normalized-csv",
+        action="store_true",
+        help="Treat input files as normalized CSVs already produced by --extract-csv.",
     )
     parser.add_argument("files", nargs="+", help="CMS ZIP/TXT/CSV files to import.")
     args = parser.parse_args(argv)
 
     if not args.db and not args.postgres_url and not args.extract_csv:
         parser.error("one of --db, --postgres-url, --extract-csv, or SUPABASE_DB_URL is required")
+    if not args.normalized_csv and not args.edit_type:
+        parser.error("--edit-type is required unless --normalized-csv is used")
+    if not args.normalized_csv and not args.import_version:
+        parser.error("--import-version is required unless --normalized-csv is used")
 
-    if args.extract_csv:
+    if args.normalized_csv and args.db:
+        summary = load_normalized_ncci_csv_to_sqlite(
+            db_path=args.db,
+            csv_files=args.files,
+        )
+    elif args.normalized_csv:
+        parser.error("--normalized-csv currently supports SQLite --db loading")
+    elif args.extract_csv:
         summary = extract_ncci_ptp_files_to_csv(
             files=args.files,
             output_csv=args.extract_csv,

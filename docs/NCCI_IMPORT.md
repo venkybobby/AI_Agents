@@ -105,6 +105,29 @@ Then load it with:
 supabase/load_ncci_ptp_from_csv.sql
 ```
 
+## Alternate: embedded SQLite reference DB
+
+If Supabase bulk import is blocked, build a local indexed SQLite reference DB from the normalized CSVs and use it as the agent reference source:
+
+```powershell
+python - <<'PY'
+from ai_agents.domains.claims_anomaly import initialize_reference_db
+initialize_reference_db(
+    ".demo/claims_reference.db",
+    "domains/claims_anomaly/reference_data/schema.sql",
+    "domains/claims_anomaly/reference_data/seed.sql",
+)
+PY
+
+python -m ai_agents.domains.ncci_importer `
+  --db .demo/claims_reference.db `
+  --normalized-csv `
+  .demo/ncci_ptp_2026q3_hospital.csv `
+  .demo/ncci_ptp_2026q3_practitioner.csv
+```
+
+This avoids Supabase import limits and still gives the claims agent indexed NCCI lookups.
+
 ## Production notes
 
 - Store downloaded CMS file checksums and import metadata.

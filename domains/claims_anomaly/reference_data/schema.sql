@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS ncci_ptp_edits (
     rationale TEXT,
     source_file TEXT,
     import_version TEXT,
-    PRIMARY KEY (code_a, code_b)
+    PRIMARY KEY (code_a, code_b, edit_type)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ncci_ptp_edits_code_pair

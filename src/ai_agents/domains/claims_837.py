@@ -104,9 +104,15 @@ def review_837_file(
     schema_path: str | Path,
     seed_path: str | Path,
 ) -> dict[str, Any]:
-    """Initialize reference data, parse an 837 file, and run claims review."""
+    """Parse an 837 file and run claims review.
 
-    initialize_reference_db(db_path, schema_path, seed_path)
+    If the reference DB does not exist, initialize a small seeded demo DB.
+    Existing DBs are preserved so full CMS NCCI reference databases are not
+    overwritten during demo/API calls.
+    """
+
+    if not Path(db_path).exists():
+        initialize_reference_db(db_path, schema_path, seed_path)
     parsed_claim = parse_837_claim(Path(edi_path).read_text(encoding="utf-8"))
     domain = ClaimsAnomalyDomain(
         load_claims_rule_pack(rules_path),

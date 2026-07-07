@@ -11,9 +11,7 @@ planning:
         type: always
     - name: run_ncci_ptp_edit_check
       condition:
-        type: min_list_length
-        field: cpt_codes
-        min: 2
+        type: always
     - name: analyze_medical_necessity
       condition:
         type: any_prefix

@@ -23,6 +23,7 @@ def test_837_clean_em_claim_runs_all_four_steps_and_auto_pays(tmp_path):
     review = payload["review"]
     assert review["execution_plan"] == [
         "check_oig_exclusion",
+        "run_ncci_ptp_edit_check",
         "analyze_medical_necessity",
         "synthesize_decision",
     ]

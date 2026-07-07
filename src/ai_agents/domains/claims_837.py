@@ -39,6 +39,8 @@ class Parsed837Claim:
     def to_claim_data(self) -> dict[str, Any]:
         return {
             "claim_id": self.claim_id,
+            "provider_id": self.provider_npi,
+            "provider_id_type": "NPI",
             "provider_npi": self.provider_npi,
             "cpt_codes": list(self.cpt_codes),
             "modifiers": list(self.modifiers),

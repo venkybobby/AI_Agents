@@ -74,14 +74,20 @@ class ClaimsReferenceRepository:
             raise ClaimsDomainError(f"active threshold not found: {key}")
         return float(row["value"])
 
-    def oig_exclusion(self, provider_npi: str) -> dict[str, Any]:
+    def oig_exclusion(self, provider_id: str, id_type: str = "NPI") -> dict[str, Any]:
+        normalized_id_type = id_type.upper()
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT reason FROM oig_exclusions WHERE provider_npi = ?",
-                (provider_npi,),
+                """
+                SELECT reason
+                FROM oig_exclusions
+                WHERE id_type = ? AND provider_id = ?
+                """,
+                (normalized_id_type, provider_id),
             ).fetchone()
         return {
-            "provider_npi": provider_npi,
+            "provider_id": provider_id,
+            "id_type": normalized_id_type,
             "is_excluded": row is not None,
             "reason": None if row is None else row["reason"],
         }
@@ -95,30 +101,53 @@ class ClaimsReferenceRepository:
         normalized_modifiers = {modifier.upper() for modifier in modifiers}
         with self._connect() as conn:
             for code_a, code_b in itertools.permutations(cpt_codes, 2):
-                row = conn.execute(
+                pair = conn.execute(
                     """
-                    SELECT modifier_allowed
+                    SELECT modifier_indicator
                     FROM ncci_ptp_edits
                     WHERE code_a = ? AND code_b = ?
                     """,
                     (code_a, code_b),
                 ).fetchone()
-                if row is None:
+                if pair is None:
                     continue
-                allowed_modifier = row["modifier_allowed"]
-                if allowed_modifier and allowed_modifier.upper() in normalized_modifiers:
+                modifier_indicator = pair["modifier_indicator"]
+                if modifier_indicator == "0":
+                    return {
+                        "passed": False,
+                        "details": f"PTP edit violation for {code_a}/{code_b}; CCMI 0 cannot be bypassed.",
+                    }
+                if modifier_indicator == "1" and self._has_valid_ncci_modifier(
+                    conn, normalized_modifiers
+                ):
                     continue
                 return {
                     "passed": False,
-                    "details": f"PTP edit violation for {code_a}/{code_b}",
+                    "details": f"PTP edit violation for {code_a}/{code_b}; valid NCCI bypass modifier required.",
                 }
         return {"passed": True, "details": None}
+
+    def _has_valid_ncci_modifier(
+        self, conn: sqlite3.Connection, modifiers: set[str]
+    ) -> bool:
+        if not modifiers:
+            return False
+        placeholders = ",".join("?" for _ in modifiers)
+        rows = conn.execute(
+            f"""
+            SELECT modifier
+            FROM ncci_bypass_modifiers
+            WHERE modifier IN ({placeholders})
+            """,
+            tuple(modifiers),
+        ).fetchall()
+        return bool(rows)
 
     def em_requirement(self, cpt_code: str) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT min_time_minutes, mdm_level
+                SELECT min_time_minutes, max_time_minutes, mdm_level
                 FROM em_requirements
                 WHERE cpt_code = ?
                 """,
@@ -129,6 +158,7 @@ class ClaimsReferenceRepository:
         return {
             "cpt_code": cpt_code,
             "min_time_minutes": int(row["min_time_minutes"]),
+            "max_time_minutes": int(row["max_time_minutes"]),
             "mdm_level": row["mdm_level"],
         }
 
@@ -153,7 +183,8 @@ class ClaimsAnomalyDomain:
 
         if "check_oig_exclusion" in execution_plan:
             tool_outputs["oig_exclusion"] = self.repository.oig_exclusion(
-                str(claim_data.get("provider_npi", ""))
+                str(claim_data.get("provider_id") or claim_data.get("provider_npi", "")),
+                str(claim_data.get("provider_id_type", "NPI")),
             )
 
         if "run_ncci_ptp_edit_check" in execution_plan:
@@ -210,7 +241,7 @@ class ClaimsAnomalyDomain:
             "is_supported": has_mdm or has_time,
             "reasoning": (
                 f"Requires {requirement['mdm_level']} MDM or "
-                f"{requirement['min_time_minutes']} minutes; found {minutes} minutes."
+                f"{requirement['min_time_minutes']}-{requirement['max_time_minutes']} minutes; found {minutes} minutes."
             ),
         }
 
@@ -273,6 +304,8 @@ def initialize_reference_db(db_path: str | Path, schema_path: str | Path, seed_p
 
     db = Path(db_path)
     db.parent.mkdir(parents=True, exist_ok=True)
+    if db.exists():
+        db.unlink()
     with sqlite3.connect(db) as conn:
         conn.executescript(Path(schema_path).read_text(encoding="utf-8"))
         conn.executescript(Path(seed_path).read_text(encoding="utf-8"))
@@ -322,6 +355,13 @@ def _deep_get(payload: dict[str, Any], dotted_path: str) -> Any:
 def _extract_minutes(notes: str) -> int:
     matches = re.findall(r"(\d+)\s*(?:minutes|mins|min)\b", notes)
     return max((int(match) for match in matches), default=0)
+
+
+def mask_sensitive_identifiers(value: str) -> str:
+    """Mask SSN and EIN values before logging or display."""
+
+    masked = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "XXX-XX-XXXX", value)
+    return re.sub(r"\b\d{2}-\d{7}\b", "XX-XXXXXXX", masked)
 
 
 def _validate_tool_rule(tool: Any) -> None:

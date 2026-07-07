@@ -19,6 +19,15 @@ def test_parse_837_claim_extracts_normalized_claim_data():
     assert "Moderate MDM" in parsed.clinical_notes
 
 
+def test_parsed_claim_exports_provider_id_for_leie_check():
+    parsed = parse_837_claim((EXAMPLES / "clean_em_837p.edi").read_text())
+
+    claim_data = parsed.to_claim_data()
+
+    assert claim_data["provider_id"] == "1234567890"
+    assert claim_data["provider_id_type"] == "NPI"
+
+
 def test_parse_837_claim_rejects_missing_required_fields():
     with pytest.raises(EDI837ParseError, match="provider NPI"):
         parse_837_claim("ST*837*0001~CLM*CLAIM0001*125.00~SV1*HC:99214*125.00~")

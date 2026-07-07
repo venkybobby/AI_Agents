@@ -79,3 +79,5 @@ python -m ai_agents.domains.claims_837 domains/claims_anomaly/examples/clean_em_
 ```
 
 The demo adapter parses a narrow subset of 837P segments into normalized claim data, then executes the same configurable claims domain rules. It is intentionally not a full X12 validator; production should replace it with a certified EDI translator while preserving the normalized claim contract.
+
+Claims source notes are tracked in `docs/CLAIMS_SOURCE_NOTES.md`.

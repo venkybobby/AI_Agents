@@ -37,6 +37,7 @@ def test_claims_domain_end_to_end_seeded_reference_data(tmp_path):
     assert result["matched_gate"] == "anomaly_auto_pay"
     assert result["execution_plan"] == [
         "check_oig_exclusion",
+        "run_ncci_ptp_edit_check",
         "analyze_medical_necessity",
         "synthesize_decision",
     ]

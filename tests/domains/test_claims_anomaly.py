@@ -38,6 +38,7 @@ def test_claims_domain_auto_pays_clean_claim(tmp_path):
     assert result.route == "AUTO_PAY"
     assert result.matched_gate == "anomaly_auto_pay"
     assert result.anomaly_score == 0.05
+    assert "run_ncci_ptp_edit_check" in result.execution_plan
     assert "analyze_medical_necessity" in result.execution_plan
 
 
@@ -73,3 +74,35 @@ def test_claims_domain_denies_ncci_violation_without_modifier(tmp_path):
     assert result.route == "DENY"
     assert result.matched_gate == "ncci_failed"
     assert result.tool_outputs["ncci_check"]["passed"] is False
+
+
+def test_claims_domain_allows_ncci_violation_with_valid_ccmi_modifier(tmp_path):
+    domain = _domain(tmp_path)
+
+    result = domain.review_claim(
+        {
+            "provider_npi": "1234567890",
+            "cpt_codes": ["97110", "97530"],
+            "modifiers": ["59"],
+            "clinical_notes": "Therapy note.",
+        }
+    )
+
+    assert result.route == "AUTO_PAY"
+    assert result.tool_outputs["ncci_check"]["passed"] is True
+
+
+def test_claims_domain_blocks_ccmi_zero_even_with_modifier(tmp_path):
+    domain = _domain(tmp_path)
+
+    result = domain.review_claim(
+        {
+            "provider_npi": "1234567890",
+            "cpt_codes": ["11111", "22222"],
+            "modifiers": ["59"],
+            "clinical_notes": "Procedure note.",
+        }
+    )
+
+    assert result.route == "DENY"
+    assert "CCMI 0" in result.tool_outputs["ncci_check"]["details"]

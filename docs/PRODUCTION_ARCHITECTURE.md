@@ -70,6 +70,8 @@ domains/claims_anomaly/rules/claims_anomaly.yaml
 
 Runtime thresholds and reference data are read from SQLite in local/CI mode. A production deployment can replace this adapter with a managed database while preserving the same rule-pack contract.
 
+Supabase production setup is documented in `docs/SUPABASE_SETUP.md`.
+
 ## 837 ingestion demo
 
 The claims domain can be exercised from a minimal 837P demo transaction:

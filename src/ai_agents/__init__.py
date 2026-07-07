@@ -4,6 +4,14 @@ from .agent import AgentResult, run_agent
 from .planner import Plan, PlanStep, create_plan
 from .config import OpenAISettings, load_openai_settings
 from .providers import DryRunProvider, OpenAIProvider, ProviderError, ProviderResponse
+from .rules import (
+    PlannerRules,
+    PlannerStepRule,
+    ReviewerRules,
+    RulePack,
+    RulePackError,
+    load_rule_pack,
+)
 from .tools import ToolAction, ToolError, WorkspaceSummary, inspect_workspace
 from .workflow import (
     RoleEvent,
@@ -20,9 +28,14 @@ __all__ = [
     "OpenAISettings",
     "Plan",
     "PlanStep",
+    "PlannerRules",
+    "PlannerStepRule",
     "ProviderError",
     "ProviderResponse",
+    "ReviewerRules",
     "RoleEvent",
+    "RulePack",
+    "RulePackError",
     "SharedTaskState",
     "ToolAction",
     "ToolError",
@@ -32,6 +45,7 @@ __all__ = [
     "create_plan",
     "inspect_workspace",
     "load_openai_settings",
+    "load_rule_pack",
     "run_agent",
     "run_workflow",
 ]

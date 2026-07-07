@@ -1,0 +1,30 @@
+schema_version: 1
+name: production-agent-baseline
+description: Baseline production-oriented rules for planning and reviewer gating.
+
+planner:
+  steps:
+    - title: Clarify success criteria
+      detail_template: "Define measurable done criteria for: {goal}"
+    - title: Identify required inputs
+      detail_template: "List files, data, credentials, tools, stakeholders, and constraints needed before execution."
+    - title: Select execution strategy
+      detail_template: "Choose the safest path that can satisfy the goal with the least required privilege."
+    - title: Define validation gates
+      detail_template: "Specify tests, review gates, rollback criteria, and evidence required before completion."
+
+reviewer:
+  require_proposed_actions: true
+  blocked_terms:
+    - write files
+    - delete
+    - remove
+    - push
+    - deploy
+    - expose credential
+    - commit secret
+    - print secret
+    - upload secret
+  blocked_finding_template: "Action needs explicit approval before execution: {action}"
+  approval_summary: "Reviewer gate passed under the active rule pack."
+  blocked_summary_template: "Reviewer gate found {count} issue(s) requiring input."

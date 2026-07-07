@@ -40,6 +40,14 @@ Run the multi-role MVP4 workflow:
 python -m ai_agents "Prepare the next agent feature" --workflow
 ```
 
+Use an explicit rule pack:
+
+```powershell
+python -m ai_agents "Prepare the next agent feature" --workflow --rules rules/agent_rules.yaml
+```
+
+Production behavior is controlled by versioned YAML rule packs under `rules/`. Planning and reviewer gates should be changed there, not hardcoded in Python.
+
 Run tests:
 
 ```powershell

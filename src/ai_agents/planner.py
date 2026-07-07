@@ -1,12 +1,10 @@
-"""Deterministic MVP planner.
-
-The first MVP intentionally avoids external model calls. This gives the repo a
-stable execution path and test loop before provider-backed agents are added.
-"""
+"""Rule-pack driven planner."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from .rules import RulePack, load_rule_pack
 
 
 @dataclass(frozen=True)
@@ -39,8 +37,8 @@ class Plan:
         }
 
 
-def create_plan(goal: str) -> Plan:
-    """Create a deterministic starter plan for a goal.
+def create_plan(goal: str, rule_pack: RulePack | None = None) -> Plan:
+    """Create a plan from the active rule pack.
 
     Args:
         goal: User-provided task objective.
@@ -53,28 +51,15 @@ def create_plan(goal: str) -> Plan:
     if not normalized_goal:
         raise ValueError("goal must not be blank")
 
+    active_rule_pack = rule_pack or load_rule_pack()
     return Plan(
         goal=normalized_goal,
-        steps=(
+        steps=tuple(
             PlanStep(
-                order=1,
-                title="Clarify success criteria",
-                detail=f"Define what done means for: {normalized_goal}",
-            ),
-            PlanStep(
-                order=2,
-                title="Identify required inputs",
-                detail="List files, data, credentials, tools, and constraints needed before execution.",
-            ),
-            PlanStep(
-                order=3,
-                title="Break work into safe actions",
-                detail="Sequence read-only inspection before write actions, then define validation checks.",
-            ),
-            PlanStep(
-                order=4,
-                title="Validate and summarize",
-                detail="Run the relevant checks and produce a concise handoff with results and remaining risks.",
-            ),
+                order=index,
+                title=step_rule.title,
+                detail=step_rule.detail_template.format(goal=normalized_goal),
+            )
+            for index, step_rule in enumerate(active_rule_pack.planner.steps, start=1)
         ),
     )

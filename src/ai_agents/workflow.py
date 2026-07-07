@@ -8,6 +8,7 @@ from enum import StrEnum
 from .agent import run_agent
 from .planner import Plan
 from .providers import AgentProvider, ProviderResponse
+from .rules import RulePack, load_rule_pack
 
 
 class WorkflowStatus(StrEnum):
@@ -69,16 +70,19 @@ class WorkflowResult:
         }
 
 
-def run_workflow(goal: str, provider: AgentProvider) -> WorkflowResult:
+def run_workflow(
+    goal: str, provider: AgentProvider, *, rule_pack: RulePack | None = None
+) -> WorkflowResult:
     """Run planner, implementer, and reviewer roles over shared state."""
 
-    agent_result = run_agent(goal, provider)
+    active_rule_pack = rule_pack or load_rule_pack()
+    agent_result = run_agent(goal, provider, rule_pack=active_rule_pack)
     plan = agent_result.plan
 
     proposed_actions = tuple(
         f"{step.title}: {step.detail}" for step in plan.steps
     )
-    reviewer_findings = _review_actions(proposed_actions)
+    reviewer_findings = _review_actions(proposed_actions, active_rule_pack)
     status = (
         WorkflowStatus.APPROVED
         if not reviewer_findings
@@ -99,7 +103,7 @@ def run_workflow(goal: str, provider: AgentProvider) -> WorkflowResult:
         RoleEvent(
             role="reviewer",
             status=status.value,
-            detail=_review_summary(status, reviewer_findings),
+            detail=_review_summary(status, reviewer_findings, active_rule_pack),
         ),
     )
 
@@ -116,27 +120,31 @@ def run_workflow(goal: str, provider: AgentProvider) -> WorkflowResult:
     )
 
 
-def _review_actions(proposed_actions: tuple[str, ...]) -> tuple[str, ...]:
+def _review_actions(
+    proposed_actions: tuple[str, ...], rule_pack: RulePack
+) -> tuple[str, ...]:
     findings: list[str] = []
+    reviewer_rules = rule_pack.reviewer
 
-    if not proposed_actions:
+    if reviewer_rules.require_proposed_actions and not proposed_actions:
         findings.append("No proposed actions were generated.")
 
-    write_like_terms = ("write files", "delete", "remove", "push", "deploy")
     for action in proposed_actions:
         lowered = action.lower()
-        if any(term in lowered for term in write_like_terms):
+        if any(term in lowered for term in reviewer_rules.blocked_terms):
             findings.append(
-                f"Action needs explicit approval before execution: {action}"
+                reviewer_rules.blocked_finding_template.format(action=action)
             )
 
     return tuple(findings)
 
 
 def _review_summary(
-    status: WorkflowStatus, reviewer_findings: tuple[str, ...]
+    status: WorkflowStatus, reviewer_findings: tuple[str, ...], rule_pack: RulePack
 ) -> str:
     if status is WorkflowStatus.APPROVED:
-        return "Reviewer gate passed. Proposed actions are read-only or validation-focused."
+        return rule_pack.reviewer.approval_summary
 
-    return f"Reviewer gate found {len(reviewer_findings)} issue(s) requiring input."
+    return rule_pack.reviewer.blocked_summary_template.format(
+        count=len(reviewer_findings)
+    )

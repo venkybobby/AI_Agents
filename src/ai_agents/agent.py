@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .planner import Plan, create_plan
 from .providers import AgentProvider, ProviderRequest, ProviderResponse
+from .rules import RulePack, load_rule_pack
 from .tools import WorkspaceSummary, inspect_workspace
 
 
@@ -33,10 +34,12 @@ def run_agent(
     provider: AgentProvider,
     *,
     inspect_path: str | Path | None = None,
+    rule_pack: RulePack | None = None,
 ) -> AgentResult:
     """Plan a goal and ask the provider for a normalized response."""
 
-    plan = create_plan(goal)
+    active_rule_pack = rule_pack or load_rule_pack()
+    plan = create_plan(goal, active_rule_pack)
     workspace = inspect_workspace(inspect_path) if inspect_path is not None else None
     prompt = _build_provider_prompt(plan)
     response = provider.complete(ProviderRequest(goal=plan.goal, prompt=prompt))

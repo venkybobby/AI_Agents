@@ -8,6 +8,7 @@ from typing import Sequence
 
 from .agent import run_agent
 from .providers import ProviderError, provider_from_env, provider_from_name
+from .rules import RulePackError, load_rule_pack
 from .tools import ToolError
 from .workflow import run_workflow
 
@@ -32,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run the MVP4 planner/implementer/reviewer workflow.",
     )
+    parser.add_argument(
+        "--rules",
+        metavar="PATH",
+        help="Path to a YAML rule pack. Defaults to rules/agent_rules.yaml.",
+    )
     return parser
 
 
@@ -45,12 +51,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.provider is not None
             else provider_from_env()
         )
+        rule_pack = load_rule_pack(args.rules)
         result = (
-            run_workflow(args.goal, provider)
+            run_workflow(args.goal, provider, rule_pack=rule_pack)
             if args.workflow
-            else run_agent(args.goal, provider, inspect_path=args.inspect)
+            else run_agent(
+                args.goal,
+                provider,
+                inspect_path=args.inspect,
+                rule_pack=rule_pack,
+            )
         )
-    except (ProviderError, ToolError, ValueError) as exc:
+    except (ProviderError, RulePackError, ToolError, ValueError) as exc:
         parser.error(str(exc))
 
     print(json.dumps(result.to_dict(), indent=2))

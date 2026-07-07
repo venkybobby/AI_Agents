@@ -59,3 +59,16 @@ Goal: make the agent useful with a real provider path while preserving local dry
 - Add GitHub Actions test workflow.
 
 Status: complete.
+
+## MVP 6 — Production Rule Packs + E2E
+
+Goal: remove hardcoded planning/reviewer policy and make behavior governed by validated rule packs.
+
+- External YAML rule pack under `rules/`.
+- Loader validates schema, required fields, and templates.
+- Planner steps come from the active rule pack.
+- Reviewer gates come from the active rule pack.
+- CLI supports `--rules`.
+- E2E tests execute the real CLI.
+
+Status: complete.

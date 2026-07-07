@@ -7,7 +7,7 @@ name = "ai-agents"
 version = "0.1.0"
 description = "Standalone workspace for AI agent MVPs."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["PyYAML>=6.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

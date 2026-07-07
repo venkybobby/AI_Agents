@@ -17,6 +17,17 @@ python -m ai_agents "Plan a research workflow for market analysis" --provider dr
 
 Provider selection defaults to `AI_AGENTS_PROVIDER`, falling back to `dry-run`.
 
+Use the optional OpenAI provider:
+
+```powershell
+python -m pip install -e ".[openai]"
+$env:AI_AGENTS_PROVIDER = "openai"
+$env:OPENAI_API_KEY = "<your key>"
+python -m ai_agents "Draft a repo cleanup plan" --workflow
+```
+
+Copy `.env.example` for the supported environment settings.
+
 Inspect a workspace in read-only mode:
 
 ```powershell

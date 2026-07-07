@@ -47,3 +47,15 @@ Goal: coordinate planner, implementer, and reviewer roles.
 - Run summary generated at the end.
 
 Status: complete.
+
+## MVP 5 — OpenAI Provider + CI
+
+Goal: make the agent useful with a real provider path while preserving local dry-run development.
+
+- Add environment-backed provider settings.
+- Add optional OpenAI provider adapter.
+- Keep dry-run as the default provider.
+- Mock provider tests; no live API calls in CI.
+- Add GitHub Actions test workflow.
+
+Status: complete.

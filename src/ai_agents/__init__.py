@@ -2,7 +2,8 @@
 
 from .agent import AgentResult, run_agent
 from .planner import Plan, PlanStep, create_plan
-from .providers import DryRunProvider, ProviderError, ProviderResponse
+from .config import OpenAISettings, load_openai_settings
+from .providers import DryRunProvider, OpenAIProvider, ProviderError, ProviderResponse
 from .tools import ToolAction, ToolError, WorkspaceSummary, inspect_workspace
 from .workflow import (
     RoleEvent,
@@ -15,6 +16,8 @@ from .workflow import (
 __all__ = [
     "AgentResult",
     "DryRunProvider",
+    "OpenAIProvider",
+    "OpenAISettings",
     "Plan",
     "PlanStep",
     "ProviderError",
@@ -28,6 +31,7 @@ __all__ = [
     "WorkflowStatus",
     "create_plan",
     "inspect_workspace",
+    "load_openai_settings",
     "run_agent",
     "run_workflow",
 ]

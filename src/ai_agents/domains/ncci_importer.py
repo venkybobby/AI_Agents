@@ -274,17 +274,44 @@ def _iter_xlsx_rows(payload: bytes, source_name: str) -> Iterator[tuple[str, str
 
     workbook = load_workbook(io.BytesIO(payload), read_only=True, data_only=True)
     for sheet in workbook.worksheets:
-        rows = sheet.iter_rows(values_only=True)
-        try:
-            header = next(rows)
-        except StopIteration:
+        all_rows = list(sheet.iter_rows(values_only=True))
+        header_index = _find_excel_header_index(all_rows)
+        if header_index is None:
             continue
+        header = all_rows[header_index]
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["" if cell is None else cell for cell in header])
-        for row in rows:
+        writer.writerow(_normalize_excel_header_row(header))
+        for row in all_rows[header_index + 1 :]:
             writer.writerow(["" if cell is None else cell for cell in row])
         yield f"{source_name}:{sheet.title}", output.getvalue()
+
+
+def _find_excel_header_index(rows: list[tuple[object, ...]]) -> int | None:
+    for index, row in enumerate(rows):
+        normalized = [_normalize_header(str(cell or "")) for cell in row]
+        if "column1" in normalized and "column2" in normalized:
+            return index
+    return None
+
+
+def _normalize_excel_header_row(row: tuple[object, ...]) -> list[str]:
+    normalized_row: list[str] = []
+    for cell in row:
+        normalized = _normalize_header(str(cell or ""))
+        if normalized == "column1":
+            normalized_row.append("Column 1 Code")
+        elif normalized == "column2":
+            normalized_row.append("Column 2 Code")
+        elif normalized == "effective":
+            normalized_row.append("Effective Date")
+        elif normalized == "deletion":
+            normalized_row.append("Deletion Date")
+        elif normalized == "modifier":
+            normalized_row.append("Modifier Indicator")
+        else:
+            normalized_row.append("" if cell is None else str(cell))
+    return normalized_row
 
 
 def _decode_bytes(payload: bytes) -> str:

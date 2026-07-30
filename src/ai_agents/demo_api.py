@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +38,16 @@ class Review837Request(BaseModel):
     edi_text: str = Field(..., min_length=1, max_length=1_000_000)
 
 
+class VertexPredictRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
+
+    instances: list[dict[str, Any]] = Field(..., min_length=1, max_length=100)
+
+
+class VertexPredictResponse(BaseModel):
+    predictions: list[Review837Response]
+
+
 class ScenarioSummary(BaseModel):
     id: str
     label: str
@@ -56,7 +67,13 @@ class Review837Response(BaseModel):
     rule_pack_version: str
 
 
-app = FastAPI(title="AI_Agents Claims Demo", version=APP_VERSION)
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    await asyncio.to_thread(_download_reference_db_from_gcs)
+    yield
+
+
+app = FastAPI(title="AI_Agents Claims Demo", version=APP_VERSION, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "*").split(","),
@@ -97,6 +114,28 @@ async def review_837(payload: Review837Request, request: Request) -> Review837Re
     return _response_from_payload(result)
 
 
+@app.post("/predict", response_model=VertexPredictResponse)
+async def vertex_predict(
+    payload: VertexPredictRequest,
+    request: Request,
+) -> VertexPredictResponse:
+    predictions: list[Review837Response] = []
+    for index, instance in enumerate(payload.instances):
+        edi_text = str(instance.get("edi_text", "")).strip()
+        if not edi_text:
+            raise _http_error(
+                "INVALID_VERTEX_INSTANCE",
+                f"instances[{index}].edi_text is required",
+                request,
+            )
+        try:
+            result = await asyncio.to_thread(_review_edi_text, edi_text)
+        except (ClaimsDomainError, EDI837ParseError, OSError, ValueError) as exc:
+            raise _http_error("VERTEX_PREDICTION_FAILED", str(exc), request) from exc
+        predictions.append(_response_from_payload(result))
+    return VertexPredictResponse(predictions=predictions)
+
+
 @app.post("/api/v1/demo/scenarios/{scenario_id}/run", response_model=Review837Response)
 async def run_scenario(scenario_id: str, request: Request) -> Review837Response:
     scenario_path = DEFAULT_SCENARIOS / f"{scenario_id}.edi"
@@ -126,6 +165,42 @@ def _review_edi_file(edi_file: Path) -> dict[str, Any]:
         schema_path=DEFAULT_SCHEMA,
         seed_path=DEFAULT_SEED,
     )
+
+
+def _download_reference_db_from_gcs() -> None:
+    gcs_uri = os.getenv("AI_AGENTS_REFERENCE_DB_GCS_URI", "").strip()
+    if not gcs_uri:
+        return
+
+    db_path = Path(os.getenv("AI_AGENTS_REFERENCE_DB", str(DEFAULT_DB)))
+    if db_path.exists() and os.getenv("AI_AGENTS_REFERENCE_DB_OVERWRITE", "").lower() not in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return
+
+    bucket_name, blob_name = _parse_gcs_uri(gcs_uri)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from google.cloud import storage
+    except ImportError as exc:
+        raise RuntimeError(
+            'GCS reference DB bootstrap requires: python -m pip install -e ".[gcp]"'
+        ) from exc
+
+    client = storage.Client()
+    client.bucket(bucket_name).blob(blob_name).download_to_filename(str(db_path))
+
+
+def _parse_gcs_uri(uri: str) -> tuple[str, str]:
+    if not uri.startswith("gs://"):
+        raise ValueError("AI_AGENTS_REFERENCE_DB_GCS_URI must start with gs://")
+    path = uri.removeprefix("gs://")
+    bucket_name, separator, blob_name = path.partition("/")
+    if not bucket_name or not separator or not blob_name:
+        raise ValueError("AI_AGENTS_REFERENCE_DB_GCS_URI must include bucket and object")
+    return bucket_name, blob_name
 
 
 def _response_from_payload(payload: dict[str, Any]) -> Review837Response:

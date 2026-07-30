@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from .providers import ProviderError
+from .errors import ProviderError
 
 
 @dataclass(frozen=True)

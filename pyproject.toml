@@ -20,6 +20,7 @@ dev = ["httpx>=0.27", "pytest>=8.0"]
 openai = ["openai>=2.0.0"]
 postgres = ["psycopg[binary]>=3.2"]
 excel = ["openpyxl>=3.1"]
+gcp = ["google-cloud-storage>=2.18"]
 ui = ["streamlit>=1.36", "requests>=2.32"]
 
 [project.scripts]

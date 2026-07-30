@@ -1,6 +1,9 @@
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
-from ai_agents.demo_api import app
+from ai_agents.demo_api import app, _parse_gcs_uri
 
 
 def test_health_returns_ok():
@@ -57,3 +60,29 @@ def test_run_medical_necessity_failure_escalates(monkeypatch, tmp_path):
     payload = response.json()
     assert payload["route"] == "ESCALATE_SIU"
     assert payload["matched_gate"] == "medical_necessity_failed"
+
+
+def test_vertex_predict_accepts_instances(monkeypatch, tmp_path):
+    monkeypatch.setenv("AI_AGENTS_REFERENCE_DB", str(tmp_path / "claims_reference.db"))
+    client = TestClient(app)
+    scenario = Path("domains/claims_anomaly/examples/clean_em_837p.edi")
+    edi_text = scenario.read_text(encoding="utf-8")
+
+    response = client.post("/predict", json={"instances": [{"edi_text": edi_text}]})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["predictions"][0]["route"] == "AUTO_PAY"
+
+
+def test_parse_gcs_uri_requires_bucket_and_object():
+    assert _parse_gcs_uri("gs://claims-reference/claims_reference.db") == (
+        "claims-reference",
+        "claims_reference.db",
+    )
+
+    with pytest.raises(ValueError, match="must start with gs://"):
+        _parse_gcs_uri("https://example.com/claims_reference.db")
+
+    with pytest.raises(ValueError, match="must include bucket and object"):
+        _parse_gcs_uri("gs://claims-reference")

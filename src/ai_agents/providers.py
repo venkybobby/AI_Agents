@@ -6,9 +6,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-
-class ProviderError(RuntimeError):
-    """Raised when provider configuration or execution fails."""
+from .errors import ProviderError
 
 
 @dataclass(frozen=True)

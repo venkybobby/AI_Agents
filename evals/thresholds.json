@@ -1,0 +1,5 @@
+{
+  "auto_pay": 0.30,
+  "siu_escalation": 0.75,
+  "auto_deny": 0.95
+}

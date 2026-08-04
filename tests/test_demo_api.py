@@ -88,6 +88,33 @@ def test_vertex_predict_accepts_instances(monkeypatch, tmp_path):
     assert payload["predictions"][0]["route"] == "AUTO_PAY"
 
 
+def test_vertex_predict_accepts_claim_data_instances(monkeypatch, tmp_path):
+    monkeypatch.setenv("AI_AGENTS_REFERENCE_DB", str(tmp_path / "claims_reference.db"))
+    client = TestClient(app)
+
+    response = client.post(
+        "/predict",
+        json={
+            "instances": [
+                {
+                    "claim_data": {
+                        "claim_id": "API-GC-04",
+                        "provider_npi": "1234567890",
+                        "cpt_codes": ["97110", "97530"],
+                        "modifiers": ["59"],
+                        "clinical_notes": "Distinct therapy services.",
+                    }
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["predictions"][0]["route"] == "PEND_MDR"
+    assert payload["predictions"][0]["matched_gate"] == "ncci_modifier_review"
+
+
 def test_parse_gcs_uri_requires_bucket_and_object():
     assert _parse_gcs_uri("gs://claims-reference/claims_reference.db") == (
         "claims-reference",

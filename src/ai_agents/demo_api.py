@@ -14,7 +14,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
 from .domains.claims_837 import EDI837ParseError, review_837_file
-from .domains.claims_anomaly import ClaimsDomainError
+from .domains.claims_anomaly import (
+    ClaimsAnomalyDomain,
+    ClaimsDomainError,
+    ClaimsReferenceRepository,
+    initialize_reference_db,
+    load_claims_rule_pack,
+)
 
 
 APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
@@ -121,11 +127,26 @@ async def vertex_predict(
 ) -> VertexPredictResponse:
     predictions: list[Review837Response] = []
     for index, instance in enumerate(payload.instances):
+        if "claim_data" in instance:
+            claim_data = instance["claim_data"]
+            if not isinstance(claim_data, dict):
+                raise _http_error(
+                    "INVALID_VERTEX_INSTANCE",
+                    f"instances[{index}].claim_data must be an object",
+                    request,
+                )
+            try:
+                result = await asyncio.to_thread(_review_claim_data, claim_data)
+            except (ClaimsDomainError, OSError, ValueError) as exc:
+                raise _http_error("VERTEX_PREDICTION_FAILED", str(exc), request) from exc
+            predictions.append(_response_from_payload(result))
+            continue
+
         edi_text = str(instance.get("edi_text", "")).strip()
         if not edi_text:
             raise _http_error(
                 "INVALID_VERTEX_INSTANCE",
-                f"instances[{index}].edi_text is required",
+                f"instances[{index}] must include edi_text or claim_data",
                 request,
             )
         try:
@@ -165,6 +186,20 @@ def _review_edi_file(edi_file: Path) -> dict[str, Any]:
         schema_path=DEFAULT_SCHEMA,
         seed_path=DEFAULT_SEED,
     )
+
+
+def _review_claim_data(claim_data: dict[str, Any]) -> dict[str, Any]:
+    db_path = Path(os.getenv("AI_AGENTS_REFERENCE_DB", str(DEFAULT_DB)))
+    if not db_path.exists():
+        initialize_reference_db(db_path, DEFAULT_SCHEMA, DEFAULT_SEED)
+    domain = ClaimsAnomalyDomain(
+        load_claims_rule_pack(DEFAULT_RULES),
+        ClaimsReferenceRepository(db_path),
+    )
+    return {
+        "parsed_claim": claim_data,
+        "review": domain.review_claim(claim_data).to_dict(),
+    }
 
 
 def _download_reference_db_from_gcs() -> None:

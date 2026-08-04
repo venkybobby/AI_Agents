@@ -36,12 +36,18 @@ routing:
       operator: equals
       value: false
       route: DENY
+    - id: ncci_modifier_review
+      description: CMS NCCI CCMI-1 pair with a valid modifier requires modifier appropriateness review.
+      source: ncci_check.requires_manual_review
+      operator: equals
+      value: true
+      route: PEND_MDR
     - id: medical_necessity_failed
-      description: Clinical evidence does not support billed E/M complexity.
+      description: Clinical evidence does not support billed E/M complexity; route to Medical Review unless fraud-pattern gates apply.
       source: medical_necessity_check.is_supported
       operator: equals
       value: false
-      route: ESCALATE_SIU
+      route: PEND_MR
     - id: anomaly_auto_deny
       description: Dynamic auto-deny threshold from reference DB.
       source: anomaly_score

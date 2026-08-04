@@ -76,7 +76,7 @@ def test_claims_domain_denies_ncci_violation_without_modifier(tmp_path):
     assert result.tool_outputs["ncci_check"]["passed"] is False
 
 
-def test_claims_domain_allows_ncci_violation_with_valid_ccmi_modifier(tmp_path):
+def test_claims_domain_pends_valid_ccmi_one_modifier_for_mdr(tmp_path):
     domain = _domain(tmp_path)
 
     result = domain.review_claim(
@@ -88,8 +88,10 @@ def test_claims_domain_allows_ncci_violation_with_valid_ccmi_modifier(tmp_path):
         }
     )
 
-    assert result.route == "AUTO_PAY"
+    assert result.route == "PEND_MDR"
+    assert result.matched_gate == "ncci_modifier_review"
     assert result.tool_outputs["ncci_check"]["passed"] is True
+    assert result.tool_outputs["ncci_check"]["requires_manual_review"] is True
 
 
 def test_claims_domain_blocks_ccmi_zero_even_with_modifier(tmp_path):

@@ -46,6 +46,21 @@ def test_837_ncci_claim_executes_ncci_and_denies(tmp_path):
     assert review["matched_gate"] == "ncci_failed"
 
 
+def test_837_ncci_valid_modifier_pends_mdr(tmp_path):
+    payload = review_837_file(
+        EXAMPLES / "ncci_allowed_modifier_837p.edi",
+        rules_path=RULES,
+        db_path=tmp_path / "reference.db",
+        schema_path=SCHEMA,
+        seed_path=SEED,
+    )
+
+    review = payload["review"]
+    assert review["route"] == "PEND_MDR"
+    assert review["matched_gate"] == "ncci_modifier_review"
+    assert review["tool_outputs"]["ncci_check"]["requires_manual_review"] is True
+
+
 def test_837_oig_claim_executes_oig_and_denies_with_report(tmp_path):
     payload = review_837_file(
         EXAMPLES / "oig_excluded_837p.edi",

@@ -67,17 +67,26 @@ class ClaimsReferenceRepository:
                 if modifier_indicator == "0":
                     return {
                         "passed": False,
+                        "requires_manual_review": False,
                         "details": f"PTP edit violation for {code_a}/{code_b}; CCMI 0 cannot be bypassed.",
                     }
                 if modifier_indicator == "1" and self._has_valid_ncci_modifier(
                     conn, normalized_modifiers
                 ):
-                    continue
+                    return {
+                        "passed": True,
+                        "requires_manual_review": True,
+                        "details": (
+                            f"PTP edit for {code_a}/{code_b} has CCMI 1 and a valid modifier; "
+                            "modifier appropriateness requires Medical Director Review."
+                        ),
+                    }
                 return {
                     "passed": False,
+                    "requires_manual_review": False,
                     "details": f"PTP edit violation for {code_a}/{code_b}; valid NCCI bypass modifier required.",
                 }
-        return {"passed": True, "details": None}
+        return {"passed": True, "requires_manual_review": False, "details": None}
 
     def _has_valid_ncci_modifier(
         self, conn: sqlite3.Connection, modifiers: set[str]

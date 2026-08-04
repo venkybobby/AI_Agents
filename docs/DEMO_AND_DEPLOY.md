@@ -33,9 +33,9 @@ Demo scenarios:
 
 - `clean_em_837p` -> `AUTO_PAY`
 - `ncci_violation_837p` -> `DENY`
-- `ncci_allowed_modifier_837p` -> `AUTO_PAY`
+- `ncci_allowed_modifier_837p` -> `PEND_MDR`
 - `oig_excluded_837p` -> `DENY_AND_REPORT`
-- `medical_necessity_failure_837p` -> `ESCALATE_SIU`
+- `medical_necessity_failure_837p` -> `PEND_MR`
 
 ## Reference DB
 

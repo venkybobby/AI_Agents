@@ -50,7 +50,7 @@ def test_run_clean_scenario_returns_timeline(monkeypatch, tmp_path):
     ]
 
 
-def test_run_medical_necessity_failure_escalates(monkeypatch, tmp_path):
+def test_run_medical_necessity_failure_pends_medical_review(monkeypatch, tmp_path):
     monkeypatch.setenv("AI_AGENTS_REFERENCE_DB", str(tmp_path / "claims_reference.db"))
     client = TestClient(app)
 
@@ -58,8 +58,21 @@ def test_run_medical_necessity_failure_escalates(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["route"] == "ESCALATE_SIU"
+    assert payload["route"] == "PEND_MR"
     assert payload["matched_gate"] == "medical_necessity_failed"
+
+
+def test_run_ncci_allowed_modifier_pends_mdr(monkeypatch, tmp_path):
+    monkeypatch.setenv("AI_AGENTS_REFERENCE_DB", str(tmp_path / "claims_reference.db"))
+    client = TestClient(app)
+
+    response = client.post("/api/v1/demo/scenarios/ncci_allowed_modifier_837p/run")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["route"] == "PEND_MDR"
+    assert payload["matched_gate"] == "ncci_modifier_review"
+    assert payload["tool_outputs"]["ncci_check"]["requires_manual_review"] is True
 
 
 def test_vertex_predict_accepts_instances(monkeypatch, tmp_path):

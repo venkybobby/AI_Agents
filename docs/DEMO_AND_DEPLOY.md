@@ -29,6 +29,30 @@ $env:AI_AGENTS_API_URL = "http://localhost:8000"
 streamlit run streamlit_app.py
 ```
 
+## UI workflow
+
+The Streamlit app supports the demo work queue flow:
+
+1. Run one of the built-in 837 scenarios or paste/upload a new 837.
+2. The backend executes OIG, NCCI, medical necessity, and synthesis/routing.
+3. The UI creates a work item after successful processing.
+4. The work item is placed into a route-specific bucket:
+   - `AUTO_PAY` -> Auto Pay Complete
+   - `DENY` -> Coding Denial Review
+   - `DENY_AND_REPORT` -> Compliance Reporting
+   - `PEND_MDR` -> Medical Director Review
+   - `PEND_MR` -> Medical Review
+   - `ESCALATE_SIU` -> SIU Investigation
+   - fallback -> Manual Review
+5. Use the `Work buckets` tab to assign items to users and update status.
+
+For local demos, bucket assignments are stored in `.demo/claims_work_buckets.json`.
+Override with:
+
+```powershell
+$env:CLAIMS_WORK_BUCKETS_PATH = ".demo\my_claims_work_buckets.json"
+```
+
 Demo scenarios:
 
 - `clean_em_837p` -> `AUTO_PAY`

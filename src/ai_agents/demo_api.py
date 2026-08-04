@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
+from .work_buckets import WorkBucketStore
 from .domains.claims_837 import EDI837ParseError, review_837_file
 from .domains.claims_anomaly import (
     ClaimsAnomalyDomain,
@@ -71,6 +72,33 @@ class Review837Response(BaseModel):
     tool_outputs: dict[str, Any]
     rule_pack_id: str
     rule_pack_version: str
+
+
+class WorkItemCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
+
+    claim_id: str = Field(..., min_length=1, max_length=128)
+    route: str = Field(..., min_length=1, max_length=64)
+    matched_gate: str | None = None
+    anomaly_score: float
+    source: str = Field("ui", min_length=1, max_length=64)
+    parsed_claim: dict[str, Any] = Field(default_factory=dict)
+    tool_outputs: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkItemAssign(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
+
+    assignee: str = Field(..., min_length=1, max_length=128)
+    status: str = Field("open", pattern="^(open|in_progress|complete)$")
+
+
+class WorkItemResponse(BaseModel):
+    item: dict[str, Any]
+
+
+class WorkBucketsResponse(BaseModel):
+    buckets: list[dict[str, Any]]
 
 
 @asynccontextmanager
@@ -167,6 +195,50 @@ async def run_scenario(scenario_id: str, request: Request) -> Review837Response:
     except (ClaimsDomainError, EDI837ParseError, OSError, ValueError) as exc:
         raise _http_error("SCENARIO_REVIEW_FAILED", str(exc), request) from exc
     return _response_from_payload(result)
+
+
+@app.post("/api/v1/work-items", response_model=WorkItemResponse)
+async def create_work_item(payload: WorkItemCreate) -> WorkItemResponse:
+    item = await asyncio.to_thread(
+        WorkBucketStore.from_env().create_item,
+        claim_id=payload.claim_id,
+        route=payload.route,
+        matched_gate=payload.matched_gate,
+        anomaly_score=payload.anomaly_score,
+        source=payload.source,
+        parsed_claim=payload.parsed_claim,
+        tool_outputs=payload.tool_outputs,
+    )
+    return WorkItemResponse(item=item)
+
+
+@app.get("/api/v1/work-buckets", response_model=WorkBucketsResponse)
+async def list_work_buckets() -> WorkBucketsResponse:
+    payload = await asyncio.to_thread(WorkBucketStore.from_env().list_buckets)
+    return WorkBucketsResponse(**payload)
+
+
+@app.patch("/api/v1/work-items/{item_id}/assign", response_model=WorkItemResponse)
+async def assign_work_item(
+    item_id: str,
+    payload: WorkItemAssign,
+    request: Request,
+) -> WorkItemResponse:
+    try:
+        item = await asyncio.to_thread(
+            WorkBucketStore.from_env().assign_item,
+            item_id=item_id,
+            assignee=payload.assignee,
+            status=payload.status,
+        )
+    except KeyError as exc:
+        raise _http_error(
+            "WORK_ITEM_NOT_FOUND",
+            f"unknown work item: {item_id}",
+            request,
+            status_code=404,
+        ) from exc
+    return WorkItemResponse(item=item)
 
 
 def _review_edi_text(edi_text: str) -> dict[str, Any]:

@@ -1,0 +1,51 @@
+name: Deploy Vertex AI
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "Vertex AI region"
+        required: true
+        default: "us-central1"
+      reference_db_gcs_uri:
+        description: "Optional gs:// path to full claims_reference.db"
+        required: false
+        default: ""
+      min_replica_count:
+        description: "Minimum Vertex replicas"
+        required: true
+        default: "1"
+      max_replica_count:
+        description: "Maximum Vertex replicas"
+        required: true
+        default: "2"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy to Vertex AI
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          REGION: ${{ inputs.region }}
+          AI_AGENTS_REFERENCE_DB_GCS_URI: ${{ inputs.reference_db_gcs_uri }}
+          MIN_REPLICA_COUNT: ${{ inputs.min_replica_count }}
+          MAX_REPLICA_COUNT: ${{ inputs.max_replica_count }}
+        run: bash scripts/deploy_vertex.sh

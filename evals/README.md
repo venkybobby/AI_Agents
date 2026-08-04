@@ -31,8 +31,9 @@ Environment variables:
 
 Run directly:
 
-```powershell
-$env:CLAIMS_AGENT_ENDPOINT_URL = "https://YOUR_ENDPOINT_BASE_URL"
+```bash
+export CLAIMS_AGENT_ENDPOINT_URL="https://us-central1-aiplatform.googleapis.com/v1/projects/claimsanamolyagent/locations/us-central1/endpoints/ENDPOINT_ID:predict"
+export CLAIMS_AGENT_ENDPOINT_TOKEN="$(gcloud auth print-access-token)"
 python -m evals.deployed_endpoint_diff
 ```
 
@@ -42,7 +43,7 @@ Run through pytest:
 python -m pytest evals/test_deployed_diff.py -q
 ```
 
-The deployed request reuses the app's existing Vertex `/predict` shape:
+The deployed request reuses the app's existing Vertex `/predict` body shape:
 
 ```json
 {

@@ -6,7 +6,16 @@ import os
 
 import pytest
 
-from evals.deployed_endpoint_diff import diff_endpoint, print_rows
+from evals.deployed_endpoint_diff import diff_endpoint, prediction_url, print_rows
+
+
+def test_prediction_url_supports_container_and_vertex_api_routes():
+    assert prediction_url("https://example.com") == "https://example.com/predict"
+    assert prediction_url("https://example.com/predict") == "https://example.com/predict"
+    assert (
+        prediction_url("https://us-central1-aiplatform.googleapis.com/v1/projects/p/locations/us-central1/endpoints/123:predict")
+        == "https://us-central1-aiplatform.googleapis.com/v1/projects/p/locations/us-central1/endpoints/123:predict"
+    )
 
 
 @pytest.mark.skipif(

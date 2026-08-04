@@ -35,7 +35,9 @@ def prediction_url(endpoint_url: str) -> str:
     """Build the deployed `/predict` URL without inventing a new schema."""
 
     trimmed = endpoint_url.rstrip("/")
-    return trimmed if trimmed.endswith("/predict") else f"{trimmed}/predict"
+    if trimmed.endswith("/predict") or trimmed.endswith(":predict"):
+        return trimmed
+    return f"{trimmed}/predict"
 
 
 def deployed_prediction(

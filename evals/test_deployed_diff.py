@@ -156,6 +156,30 @@ def test_classification_exit_code_warns_on_stale_and_fails_closed():
     assert classification_exit_code("FAIL_DRIFT_UNKNOWN_DEPLOYMENT") == 1
 
 
+def test_stale_deployment_with_route_mismatch_fails_as_stale_and_drift():
+    rows = [
+        DiffRow(
+            record_id="GC-SYN-STale-DRIFT",
+            local_route="PEND_MR",
+            deployed_route="AUTO_PAY",
+            local_gate="medical_necessity_failed",
+            deployed_gate="anomaly_auto_pay",
+            match=False,
+        )
+    ]
+    freshness = DeploymentFreshness(
+        repo_head="newhead1",
+        deployed_image_uri="us-central1-docker.pkg.dev/project/repo/claims-agent:oldhead",
+        deployed_image_tag="oldhead",
+        is_current=False,
+    )
+
+    classification = classify_result(rows, freshness)
+
+    assert classification == "FAIL_STALE_AND_DRIFT"
+    assert classification_exit_code(classification) == 1
+
+
 def test_print_deployment_freshness_labels_stale_deployment(capsys):
     print_deployment_freshness(
         DeploymentFreshness(

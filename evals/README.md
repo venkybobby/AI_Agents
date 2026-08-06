@@ -94,6 +94,21 @@ The deployed request reuses the app's existing Vertex `/predict` body shape:
 This opt-in check evaluates `medical_necessity_check.reasoning` against the only
 allowed context: `clinical_notes` plus the E/M requirement row.
 
+The current `medical_necessity_check.reasoning` text is deterministic template
+output, not model-generated text. A clean score on the real golden records
+therefore validates judge plumbing and baseline grounding, not broad judge
+quality.
+
+Before judging real golden records, the harness runs permanent synthetic
+fabrication fixtures from `evals/golden/groundedness_synthetic.jsonl`. These are
+not routing golden records. They exist to prove the judge can catch a known bad
+case before a clean run is trusted:
+
+- `SYN-OBVIOUS-GC01`: must be caught as `FAIL_UNGROUNDED`.
+- `SYN-INFERENCE-GC05` and `SYN-DEDUCTIBLE-GC06`: known blind-spot probes for
+  inference-adjacent fabrications. They are visible in output but non-blocking
+  unless the final classification is otherwise failing.
+
 Environment variables:
 
 - `SARO_EVAL_JUDGE=vertex`: explicit opt-in gate.
@@ -102,6 +117,8 @@ Environment variables:
 - `GOOGLE_GENAI_USE_VERTEXAI=True`: makes `google-genai` use Vertex AI.
 - `SARO_EVAL_JUDGE_SLEEP_SECONDS`: optional pacing delay between calls. Defaults
   to 10 seconds.
+- `SARO_EVAL_JUDGE_RERUNS`: optional consistency reruns for any real golden
+  record that lands in the boundary band or fails. Defaults to 3 total runs.
 
 Run directly:
 
@@ -115,3 +132,13 @@ python -m evals.groundedness_judge
 
 Scores in the `0.4-0.6` boundary band are printed as human-review items and do
 not fail CI. Outright failed groundedness scores exit 1.
+
+Groundedness classifications:
+
+- `PASS_GROUNDED`: synthetic obvious fabrication was caught, and real golden
+  records passed.
+- `FLAG_BOUNDARY_REVIEW`: synthetic obvious fabrication was caught, but at least
+  one synthetic blind-spot or real record landed in the 0.4-0.6 boundary band.
+  Exit 0, but visible.
+- `FAIL_UNGROUNDED`: obvious synthetic fabrication was not caught, or a real
+  golden record failed. Exit 1.

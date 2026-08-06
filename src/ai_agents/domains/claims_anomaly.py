@@ -78,7 +78,7 @@ class ClaimsAnomalyDomain:
         if requirement is None:
             return {
                 "is_supported": False,
-                "reasoning": f"No E/M reference requirement found for {em_codes[0]}.",
+                "reasoning": "No E/M reference requirement found.",
             }
 
         has_mdm = requirement["mdm_level"].lower() in notes

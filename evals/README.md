@@ -53,9 +53,17 @@ network proof:
   route differs.
 - `FAIL_STALE_AND_DRIFT`: deployed image tag is stale and at least one golden
   route differs.
-- `PASS_UNKNOWN_DEPLOYMENT` / `FAIL_DRIFT_UNKNOWN_DEPLOYMENT`: the diff could
+- `FAIL_UNKNOWN_DEPLOYMENT` / `FAIL_DRIFT_UNKNOWN_DEPLOYMENT`: the diff could
   not resolve deployment metadata, usually because the URL is not a Vertex
-  predict URL or `gcloud` is unavailable.
+  predict URL or `gcloud` is unavailable. This fails closed once
+  `CLAIMS_AGENT_ENDPOINT_URL` is configured.
+
+CI exit policy:
+
+- `PASS_CURRENT` and `PASS_STALE` exit 0.
+- Every `FAIL_*` classification exits 1.
+- If `CLAIMS_AGENT_ENDPOINT_URL` is unset, the deployed diff is explicitly
+  skipped and exits 0.
 
 Run through pytest:
 

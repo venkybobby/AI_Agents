@@ -236,10 +236,16 @@ def classify_result(rows: list[DiffRow], freshness: DeploymentFreshness) -> str:
 
     has_drift = any(not row.match for row in rows)
     if freshness.is_current is None:
-        return "FAIL_DRIFT_UNKNOWN_DEPLOYMENT" if has_drift else "PASS_UNKNOWN_DEPLOYMENT"
+        return "FAIL_DRIFT_UNKNOWN_DEPLOYMENT" if has_drift else "FAIL_UNKNOWN_DEPLOYMENT"
     if freshness.is_current:
         return "FAIL_DRIFT" if has_drift else "PASS_CURRENT"
     return "FAIL_STALE_AND_DRIFT" if has_drift else "PASS_STALE"
+
+
+def classification_exit_code(classification: str) -> int:
+    """Return the CI exit code for a deployment diff classification."""
+
+    return 1 if classification.startswith("FAIL_") else 0
 
 
 def deployed_prediction(
@@ -351,7 +357,7 @@ def main() -> int:
     print_deployment_freshness(freshness, classification)
     if os.getenv("CLAIMS_AGENT_DIFF_VERBOSE", "").strip().lower() in {"1", "true", "yes"}:
         print_network_proof(rows)
-    return 1 if any(not row.match for row in rows) else 0
+    return classification_exit_code(classification)
 
 
 if __name__ == "__main__":

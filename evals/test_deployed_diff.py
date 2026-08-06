@@ -9,6 +9,7 @@ import pytest
 from evals.deployed_endpoint_diff import (
     DeploymentFreshness,
     DiffRow,
+    classification_exit_code,
     classify_result,
     diff_endpoint,
     image_tag,
@@ -118,6 +119,41 @@ def test_classify_result_distinguishes_current_stale_and_drift():
         )
         == "FAIL_STALE_AND_DRIFT"
     )
+    assert (
+        classify_result(
+            matching_rows,
+            DeploymentFreshness(
+                repo_head="9c7665b",
+                deployed_image_uri=None,
+                deployed_image_tag=None,
+                is_current=None,
+                reason="gcloud metadata lookup failed",
+            ),
+        )
+        == "FAIL_UNKNOWN_DEPLOYMENT"
+    )
+    assert (
+        classify_result(
+            drift_rows,
+            DeploymentFreshness(
+                repo_head="9c7665b",
+                deployed_image_uri=None,
+                deployed_image_tag=None,
+                is_current=None,
+                reason="gcloud metadata lookup failed",
+            ),
+        )
+        == "FAIL_DRIFT_UNKNOWN_DEPLOYMENT"
+    )
+
+
+def test_classification_exit_code_warns_on_stale_and_fails_closed():
+    assert classification_exit_code("PASS_CURRENT") == 0
+    assert classification_exit_code("PASS_STALE") == 0
+    assert classification_exit_code("FAIL_DRIFT") == 1
+    assert classification_exit_code("FAIL_STALE_AND_DRIFT") == 1
+    assert classification_exit_code("FAIL_UNKNOWN_DEPLOYMENT") == 1
+    assert classification_exit_code("FAIL_DRIFT_UNKNOWN_DEPLOYMENT") == 1
 
 
 def test_print_deployment_freshness_labels_stale_deployment(capsys):

@@ -17,6 +17,11 @@ python -m pytest evals/test_claims_evals.py -q
 
 Golden records live in `evals/golden/claims_golden.jsonl`. Each record includes
 `claim_data`, `expected_route`, `expected_gate`, and the business rationale.
+The routing golden set currently contains 60 records and is guarded to stay in
+the 50-80 record demo range. Coverage includes OIG precedence, seeded NCCI
+CCMI-0 and CCMI-1 behavior, valid and invalid NCCI modifiers, E/M threshold
+boundaries for all seeded 2026 codes, medical review routing, and clean
+auto-pay cases.
 
 ## Deployed endpoint diff
 

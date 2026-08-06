@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,6 +23,17 @@ class DiffRow:
     local_gate: str | None
     deployed_gate: str | None
     match: bool
+    http_status: int | None = None
+    elapsed_ms: float | None = None
+    request_url: str | None = None
+
+
+@dataclass(frozen=True)
+class DeployedPrediction:
+    payload: dict[str, Any]
+    http_status: int
+    elapsed_ms: float
+    request_url: str
 
 
 def configured_endpoint_url() -> str | None:
@@ -44,25 +56,33 @@ def deployed_prediction(
     endpoint_url: str,
     claim_data: dict[str, Any],
     token: str | None,
-) -> dict[str, Any]:
+) -> DeployedPrediction:
     """Call the deployed endpoint using demo_api.VertexPredictRequest shape."""
 
     headers: dict[str, str] = {}
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
+    url = prediction_url(endpoint_url)
+    started = time.perf_counter()
     response = httpx.post(
-        prediction_url(endpoint_url),
+        url,
         json=VertexPredictRequest(instances=[{"claim_data": claim_data}]).model_dump(),
         headers=headers,
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
+    elapsed_ms = (time.perf_counter() - started) * 1000
     response.raise_for_status()
     payload = VertexPredictResponse.model_validate(response.json())
     predictions = payload.predictions
     if not predictions:
         raise ValueError("deployed endpoint returned no predictions")
-    return predictions[0].model_dump()
+    return DeployedPrediction(
+        payload=predictions[0].model_dump(),
+        http_status=response.status_code,
+        elapsed_ms=elapsed_ms,
+        request_url=url,
+    )
 
 
 def diff_endpoint(endpoint_url: str, token: str | None = None) -> list[DiffRow]:
@@ -73,8 +93,8 @@ def diff_endpoint(endpoint_url: str, token: str | None = None) -> list[DiffRow]:
     for record in load_golden_records():
         local = run_record(record, domain)
         deployed = deployed_prediction(endpoint_url, record.claim_data, token)
-        deployed_route = deployed.get("route")
-        deployed_gate = deployed.get("matched_gate")
+        deployed_route = deployed.payload.get("route")
+        deployed_gate = deployed.payload.get("matched_gate")
         rows.append(
             DiffRow(
                 record_id=record.record_id,
@@ -84,6 +104,9 @@ def diff_endpoint(endpoint_url: str, token: str | None = None) -> list[DiffRow]:
                 deployed_gate=str(deployed_gate) if deployed_gate is not None else None,
                 match=local.route == deployed_route
                 and local.matched_gate == deployed_gate,
+                http_status=deployed.http_status,
+                elapsed_ms=deployed.elapsed_ms,
+                request_url=deployed.request_url,
             )
         )
     return rows
@@ -99,6 +122,19 @@ def print_rows(rows: list[DiffRow]) -> None:
         )
 
 
+def print_network_proof(rows: list[DiffRow]) -> None:
+    """Print non-secret HTTP evidence proving the diff used the deployed endpoint."""
+
+    print("\nnetwork proof")
+    print("record_id | http_status | elapsed_ms | request_url")
+    print("----------|-------------|------------|------------")
+    for row in rows:
+        print(
+            f"{row.record_id} | {row.http_status} | "
+            f"{row.elapsed_ms:.1f} | {row.request_url}"
+        )
+
+
 def main() -> int:
     endpoint_url = configured_endpoint_url()
     if endpoint_url is None:
@@ -108,6 +144,8 @@ def main() -> int:
     token = os.getenv("CLAIMS_AGENT_ENDPOINT_TOKEN", "").strip() or None
     rows = diff_endpoint(endpoint_url, token)
     print_rows(rows)
+    if os.getenv("CLAIMS_AGENT_DIFF_VERBOSE", "").strip().lower() in {"1", "true", "yes"}:
+        print_network_proof(rows)
     return 1 if any(not row.match for row in rows) else 0
 
 

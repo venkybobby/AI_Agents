@@ -6,7 +6,13 @@ import os
 
 import pytest
 
-from evals.deployed_endpoint_diff import diff_endpoint, prediction_url, print_rows
+from evals.deployed_endpoint_diff import (
+    DiffRow,
+    diff_endpoint,
+    prediction_url,
+    print_network_proof,
+    print_rows,
+)
 
 
 def test_prediction_url_supports_container_and_vertex_api_routes():
@@ -16,6 +22,30 @@ def test_prediction_url_supports_container_and_vertex_api_routes():
         prediction_url("https://us-central1-aiplatform.googleapis.com/v1/projects/p/locations/us-central1/endpoints/123:predict")
         == "https://us-central1-aiplatform.googleapis.com/v1/projects/p/locations/us-central1/endpoints/123:predict"
     )
+
+
+def test_print_network_proof_omits_authorization_token(capsys):
+    print_network_proof(
+        [
+            DiffRow(
+                record_id="GC-01",
+                local_route="AUTO_PAY",
+                deployed_route="AUTO_PAY",
+                local_gate="anomaly_auto_pay",
+                deployed_gate="anomaly_auto_pay",
+                match=True,
+                http_status=200,
+                elapsed_ms=321.4,
+                request_url="https://example.com/endpoints/123:predict",
+            )
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "GC-01" in output
+    assert "321.4" in output
+    assert "Authorization" not in output
+    assert "Bearer" not in output
 
 
 @pytest.mark.skipif(

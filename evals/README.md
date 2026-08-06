@@ -28,6 +28,11 @@ Environment variables:
   prints `endpoint not configured, skipping drift check` and exits 0.
 - `CLAIMS_AGENT_ENDPOINT_TOKEN`: optional bearer or identity token. This value is
   never printed.
+- `CLAIMS_AGENT_DEPLOYED_IMAGE_URI`: optional override for the deployed image
+  URI. If unset, the check resolves the live Vertex endpoint's active model
+  through `gcloud`.
+- `CLAIMS_AGENT_REPO_HEAD`: optional override for the repo HEAD short SHA.
+  If unset, the check uses `git rev-parse --short HEAD`.
 
 Run directly:
 
@@ -36,6 +41,21 @@ export CLAIMS_AGENT_ENDPOINT_URL="https://us-central1-aiplatform.googleapis.com/
 export CLAIMS_AGENT_ENDPOINT_TOKEN="$(gcloud auth print-access-token)"
 python -m evals.deployed_endpoint_diff
 ```
+
+The diff prints a deployment freshness classification before the optional
+network proof:
+
+- `PASS_CURRENT`: deployed image tag matches repo HEAD and all golden routes
+  match.
+- `PASS_STALE`: deployed image tag is behind repo HEAD, but all golden routes
+  still match.
+- `FAIL_DRIFT`: deployed image tag matches repo HEAD, but at least one golden
+  route differs.
+- `FAIL_STALE_AND_DRIFT`: deployed image tag is stale and at least one golden
+  route differs.
+- `PASS_UNKNOWN_DEPLOYMENT` / `FAIL_DRIFT_UNKNOWN_DEPLOYMENT`: the diff could
+  not resolve deployment metadata, usually because the URL is not a Vertex
+  predict URL or `gcloud` is unavailable.
 
 Run through pytest:
 

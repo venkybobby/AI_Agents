@@ -11,6 +11,7 @@ from evals.groundedness_judge import (
     FLAG_BOUNDARY_REVIEW,
     PASS_GROUNDED,
     GroundednessRow,
+    build_context,
     classification_exit_code,
     classify_groundedness_run,
     evaluate_groundedness,
@@ -18,6 +19,13 @@ from evals.groundedness_judge import (
     load_synthetic_cases,
     print_summary,
     synthetic_validation_passed,
+)
+from evals.claims_eval_harness import (
+    build_domain,
+    em_requirement_context,
+    load_golden_records,
+    medical_necessity_records,
+    run_record,
 )
 
 
@@ -122,6 +130,36 @@ def test_classify_groundedness_run_and_exit_policy():
     assert classification_exit_code(PASS_GROUNDED) == 0
     assert classification_exit_code(FLAG_BOUNDARY_REVIEW) == 0
     assert classification_exit_code(FAIL_UNGROUNDED) == 1
+
+
+def test_real_golden_reasoning_only_mentions_values_present_in_judge_context():
+    domain = build_domain()
+
+    for record in medical_necessity_records(load_golden_records()):
+        result = run_record(record, domain)
+        medical_output = result.tool_outputs.get("medical_necessity_check")
+        assert isinstance(medical_output, dict)
+        reasoning = str(medical_output.get("reasoning", ""))
+        context = build_context(record.claim_data, em_requirement_context(record, domain))
+
+        claim_values = {
+            str(value)
+            for field in ("claim_id", "provider_npi", "provider_id", "provider_id_type")
+            if (value := record.claim_data.get(field)) is not None
+        }
+        for field in ("cpt_codes", "modifiers", "diagnosis_codes"):
+            for value in record.claim_data.get(field, []):
+                claim_values.add(str(value))
+
+        leaked_values = sorted(
+            value
+            for value in claim_values
+            if len(value) >= 2 and value in reasoning and value not in context
+        )
+        assert leaked_values == [], (
+            f"{record.record_id} reasoning references values outside judge context: "
+            f"{leaked_values}; reasoning={reasoning!r}; context={context!r}"
+        )
 
 
 @pytest.mark.skipif(

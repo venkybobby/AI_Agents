@@ -23,9 +23,27 @@ CCMI-0 and CCMI-1 behavior, valid and invalid NCCI modifiers, E/M threshold
 boundaries for all seeded 2026 codes, medical review routing, and clean
 auto-pay cases.
 
+Local deterministic golden tests run all 60 records. Expensive live evals use a
+bounded smoke subset by default:
+
+- `CLAIMS_AGENT_EVAL_SCOPE=smoke` or unset: use 12 representative records.
+- `CLAIMS_AGENT_EVAL_SCOPE=full`: use all 60 records for release or nightly
+  validation.
+
+Measured on August 6, 2026 against the current Vertex endpoint:
+
+- endpoint diff smoke: 12 live prediction calls.
+- endpoint diff full: 60 live prediction calls, about 94 seconds.
+- groundedness judge smoke: 3 synthetic + 8 real judge calls, about 171 seconds
+  with `SARO_EVAL_JUDGE_SLEEP_SECONDS=2`.
+- groundedness judge full: 3 synthetic + 30 real judge calls. Keep this for
+  release/nightly runs, not default CI.
+
 ## Deployed endpoint diff
 
 This catches drift between the local engine and the deployed Vertex image.
+By default it calls the live endpoint for the smoke subset only. Set
+`CLAIMS_AGENT_EVAL_SCOPE=full` to run all 60 records.
 
 Environment variables:
 
@@ -98,6 +116,8 @@ The deployed request reuses the app's existing Vertex `/predict` body shape:
 
 This opt-in check evaluates `medical_necessity_check.reasoning` against the only
 allowed context: `clinical_notes` plus the E/M requirement row.
+By default it judges the smoke subset only after the synthetic fabrication
+fixtures pass. Set `CLAIMS_AGENT_EVAL_SCOPE=full` for all real golden records.
 
 The current `medical_necessity_check.reasoning` text is deterministic template
 output, not model-generated text. A clean score on the real golden records
@@ -124,6 +144,8 @@ Environment variables:
   to 10 seconds.
 - `SARO_EVAL_JUDGE_RERUNS`: optional consistency reruns for any real golden
   record that lands in the boundary band or fails. Defaults to 3 total runs.
+- `CLAIMS_AGENT_EVAL_SCOPE`: `smoke` by default, or `full` for all 60 routing
+  golden records.
 
 Run directly:
 

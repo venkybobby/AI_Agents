@@ -15,6 +15,7 @@ from evals.claims_eval_harness import (
     load_golden_records,
     medical_necessity_records,
     run_record,
+    selected_golden_records,
 )
 
 JUDGE_MODEL = "gemini-2.5-flash"
@@ -367,9 +368,11 @@ def evaluate_groundedness() -> GroundednessRun:
     domain = build_domain()
     records = load_golden_records()
     records_by_id = {record.record_id: record for record in records}
+    selected_records = selected_golden_records(records)
     judge = build_vertex_judge()
     print(f"judge={judge.get_model_name()} metric=geval-strict")
     print("scope=medical_necessity_check.reasoning is deterministic template text")
+    print(f"eval_scope_records={len(selected_records)}")
 
     synthetic_rows = evaluate_synthetic_fixtures(
         judge=judge,
@@ -382,7 +385,7 @@ def evaluate_groundedness() -> GroundednessRun:
     real_rows = evaluate_real_golden_groundedness(
         judge=judge,
         domain=domain,
-        records=records,
+        records=selected_records,
     )
     classification = classify_groundedness_run(synthetic_rows, real_rows)
     return GroundednessRun(synthetic_rows, real_rows, classification)

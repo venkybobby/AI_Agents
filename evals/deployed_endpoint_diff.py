@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 
 from ai_agents.demo_api import VertexPredictRequest, VertexPredictResponse
-from evals.claims_eval_harness import build_domain, load_golden_records, run_record
+from evals.claims_eval_harness import build_domain, selected_golden_records, run_record
 
 REQUEST_TIMEOUT_SECONDS = 10.0
 
@@ -286,7 +286,9 @@ def diff_endpoint(endpoint_url: str, token: str | None = None) -> list[DiffRow]:
 
     domain = build_domain()
     rows: list[DiffRow] = []
-    for record in load_golden_records():
+    records = selected_golden_records()
+    print(f"eval_scope_records={len(records)}")
+    for record in records:
         local = run_record(record, domain)
         deployed = deployed_prediction(endpoint_url, record.claim_data, token)
         deployed_route = deployed.payload.get("route")

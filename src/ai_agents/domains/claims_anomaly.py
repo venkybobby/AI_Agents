@@ -84,12 +84,21 @@ class ClaimsAnomalyDomain:
         has_mdm = requirement["mdm_level"].lower() in notes
         minutes = _extract_minutes(notes)
         has_time = minutes >= requirement["min_time_minutes"]
-        return {
-            "is_supported": has_mdm or has_time,
-            "reasoning": (
+        if has_mdm:
+            reasoning = f"Requires {requirement['mdm_level']} MDM; documented {requirement['mdm_level']} MDM."
+        elif minutes > 0:
+            reasoning = (
                 f"Requires {requirement['mdm_level']} MDM or "
                 f"{requirement['min_time_minutes']}-{requirement['max_time_minutes']} minutes; found {minutes} minutes."
-            ),
+            )
+        else:
+            reasoning = (
+                f"Requires {requirement['mdm_level']} MDM or "
+                f"{requirement['min_time_minutes']}-{requirement['max_time_minutes']} minutes."
+            )
+        return {
+            "is_supported": has_mdm or has_time,
+            "reasoning": reasoning,
         }
 
     def _score(self, tool_outputs: dict[str, Any]) -> float:
